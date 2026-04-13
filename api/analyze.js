@@ -36,8 +36,8 @@ function getConfidence(score) {
 
 async function generateReport(keyword, evidenceList, score) {
   // ★ API 키 체크
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn('ANTHROPIC_API_KEY 미설정 — AI 분석 건너뜀')
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn('GEMINI_API_KEY 미설정 — AI 분석 건너뜀')
     return {
       summary: '분석 대기 중 (API 키 미설정)',
       prediction: '',
@@ -77,28 +77,29 @@ ${dataBlock}
 }`
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    })
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000
+          }
+        })
+      }
+    )
 
     if (!res.ok) {
       const errBody = await res.text()
-      console.error(`Anthropic API HTTP ${res.status}:`, errBody)
-      throw new Error(`Anthropic API ${res.status}`)
+      console.error(`Gemini API HTTP ${res.status}:`, errBody)
+      throw new Error(`Gemini API ${res.status}`)
     }
 
     const data = await res.json()
-    const text = data.content?.[0]?.text || '{}'
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
 
     // JSON 파싱 (코드블록 감싸기 대응)
     const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
