@@ -1,46 +1,54 @@
 # ============================================
-# ATLAS 환경변수 설정 가이드
+# ATLAS 환경변수 설정 가이드 (한국 시장 버전)
 # ============================================
 
 # ──────────────────────────────────────────
-# Vercel 대시보드 → 프로젝트 → Settings → Environment Variables
+# Vercel 대시보드 → Settings → Environment Variables
 # ──────────────────────────────────────────
 
 # [필수] Supabase
-SUPABASE_URL=             # Supabase 프로젝트 URL (https://xxx.supabase.co)
-SUPABASE_SERVICE_KEY=     # Supabase service_role 키 (Settings → API → service_role)
+SUPABASE_URL=             # https://xxx.supabase.co
+SUPABASE_SERVICE_KEY=     # Settings → API → service_role
 
 # [필수] 보안
-CRON_SECRET=              # 아무 랜덤 문자열 (예: atlas-cron-2024-xyz)
+CRON_SECRET=              # 랜덤 문자열
 
-# [필수] AI 분석
-ANTHROPIC_API_KEY=        # Claude API 키 (console.anthropic.com)
-                          # ※ 사용 모델: claude-sonnet-4-5-20241022
+# [필수] AI 분석 (Gemini 무료)
+GEMINI_API_KEY=           # https://aistudio.google.com/apikey
 
-# [선택] 한국 특허 — 미설정 시 KIPRIS 수집 건너뜀
-KIPRIS_KEY=               # https://plus.kipris.or.kr → API 신청
+# [권장] 네이버 뉴스 검색 (무료, 일 25,000건)
+NAVER_CLIENT_ID=          # https://developers.naver.com → 애플리케이션 등록 → 검색 API
+NAVER_CLIENT_SECRET=      # 위에서 함께 발급
 
-# [선택] 한국 국회 법안 — 미설정 시 국회 법안 수집 건너뜀
+# [선택] DART 전자공시 (무료)
+DART_KEY=                 # https://opendart.fss.or.kr → 인증키 신청
+
+# [선택] 국회 법안 (무료)
 ASSEMBLY_KEY=             # https://open.assembly.go.kr → 인증키 신청
 
-# [선택] 미국 법안 — 미설정 시 Congress 수집 건너뜀
+# [선택] 미국 법안 (무료)
 CONGRESS_KEY=             # https://api.congress.gov → 무료 신청
 
-# [선택] 유럽 특허 — 미설정 시 EPO 수집 건너뜀
-EPO_TOKEN=                # https://ops.epo.org → 무료 계정 생성 후 발급
+# [선택] 한국 특허 (무료)
+KIPRIS_KEY=               # https://plus.kipris.or.kr → API 신청
+
+# [선택] 유럽 특허 (무료)
+EPO_TOKEN=                # https://ops.epo.org → 무료 계정
 
 # ──────────────────────────────────────────
-# GitHub Actions Secrets (레포 → Settings → Secrets)
+# GitHub Actions Secrets
 # ──────────────────────────────────────────
-# 위의 모든 키 + 아래 추가 항목:
-
+# 위의 모든 키 + 아래 추가:
 VERCEL_URL=               # https://trend-analysis-app.vercel.app
-                          # ※ https:// 포함하여 입력
 
 # ──────────────────────────────────────────
-# 참고: API 키 없이도 동작하는 수집기
+# 키 없이 동작하는 소스 (무료, 키 불필요)
 # ──────────────────────────────────────────
-# - arXiv: 키 불필요 (공개 API)
-# - OpenAlex: 키 불필요 (공개 API)
-# - USPTO PatentsView: 키 불필요 (공개 API)
-# → 최소한 SUPABASE + CRON_SECRET + ANTHROPIC만 있으면 기본 동작 가능
+# - arXiv (글로벌 논문)
+# - OpenAlex (글로벌 논문)
+# - RISS (한국 논문)
+# - Google News RSS (글로벌 뉴스)
+# - 정책브리핑 RSS (한국 정책)
+#
+# → 최소: SUPABASE + CRON_SECRET + GEMINI만 있으면 기본 동작
+# → 권장: + NAVER (한국 뉴스 핵심)
