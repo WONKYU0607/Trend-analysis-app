@@ -1,0 +1,17 @@
+# Vercel 환경변수 설정 가이드
+# Vercel 대시보드 → 프로젝트 → Settings → Environment Variables 에서 입력
+
+SUPABASE_URL=             # Supabase 프로젝트 URL (https://xxx.supabase.co)
+SUPABASE_SERVICE_KEY=     # Supabase service_role 키 (Settings → API)
+ANTHROPIC_API_KEY=        # Claude API 키 (console.anthropic.com)
+CRON_SECRET=              # 아무 랜덤 문자열 (예: techtrend-secret-2024)
+
+# 아래는 공공데이터포털 / 각 기관에서 발급
+KIPRIS_KEY=               # https://plus.kipris.or.kr → API 신청
+ASSEMBLY_KEY=             # https://open.assembly.go.kr → 인증키 신청
+CONGRESS_KEY=             # https://api.congress.gov → 무료 신청
+EPO_TOKEN=                # https://ops.epo.org → 무료 계정 생성 후 발급
+
+# GitHub Actions Secrets 에도 동일하게 입력
+# 추가로 아래 항목도 GitHub Secrets 에 필요
+VERCEL_URL=               # https://your-project.vercel.app
