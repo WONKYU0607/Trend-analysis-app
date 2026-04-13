@@ -25,18 +25,31 @@ function regionOf(country) {
   return map[country] || 'Global'
 }
 
-// ── USPTO (PatentsView API) ──
+// ── USPTO (PatentSearch API v1 — 2025년부터 새 엔드포인트) ──
+// API 키 필요: https://search.patentsview.org 에서 발급
 async function fetchUSPTO(keyword) {
-  const url = `https://api.patentsview.org/patents/query?q={"_text_any":{"patent_abstract":"${keyword}"}}&f=["patent_title","patent_abstract","patent_date","patent_number"]&o={"per_page":10,"sort":[{"patent_date":"desc"}]}`
+  if (!process.env.PATENTSVIEW_KEY) {
+    console.warn('PATENTSVIEW_KEY 미설정 — USPTO 수집 건너뜀')
+    return []
+  }
+
+  const q = encodeURIComponent(JSON.stringify({ "_text_any": { "patent_title": keyword } }))
+  const f = encodeURIComponent(JSON.stringify(["patent_id", "patent_title", "patent_date", "patent_abstract"]))
+  const s = encodeURIComponent(JSON.stringify([{ "patent_date": "desc" }]))
+  const o = encodeURIComponent(JSON.stringify({ "size": 10 }))
+  const url = `https://search.patentsview.org/api/v1/patent/?q=${q}&f=${f}&s=${s}&o=${o}`
+
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, {
+      headers: { 'X-Api-Key': process.env.PATENTSVIEW_KEY }
+    })
     if (!res.ok) { console.error(`USPTO HTTP ${res.status}`); return [] }
     const data = await res.json()
     return (data.patents || []).map(p => ({
       title: p.patent_title || '(Untitled)',
       summary: p.patent_abstract?.slice(0, 300) || null,
-      source_url: p.patent_number
-        ? `https://patents.google.com/patent/US${p.patent_number}`
+      source_url: p.patent_id
+        ? `https://patents.google.com/patent/US${p.patent_id}`
         : `https://patents.google.com/?q=${encodeURIComponent(keyword)}`,
       published_at: p.patent_date,
       country: 'US'

@@ -67,38 +67,13 @@ async function fetchUSLaws(keyword) {
 }
 
 // ── EUR-Lex (유럽 법안) ──
-// ★ 수정: EUR-Lex REST API는 JSON format을 직접 지원하지 않을 수 있음
-//    CELLAR SPARQL이 더 안정적이지만, 간단히 HTML 파싱 대신 검색 URL 기반으로 처리
+// EUR-Lex는 공개 JSON API를 제공하지 않음
+// 향후 CELLAR SPARQL 엔드포인트로 연동 예정
 async function fetchEURLex(keyword) {
-  try {
-    // EUR-Lex SRU 검색 API 사용
-    const url = `https://eur-lex.europa.eu/EURLexWebService?wt=json&query=${encodeURIComponent(keyword)}&page=1&pageSize=5`
-    const res = await fetch(url, {
-      headers: { 'Accept': 'application/json' }
-    })
-
-    if (!res.ok) {
-      // 폴백: 기본 검색으로 대체
-      console.warn(`EUR-Lex API 응답 ${res.status} — 폴백 사용`)
-      return []
-    }
-
-    const data = await res.json()
-    const results = data?.results || data?.cellarDocuments || []
-
-    if (!Array.isArray(results) || !results.length) return []
-
-    return results.slice(0, 5).map(r => ({
-      title: r.title || r.name || `${keyword} — EU Legislation`,
-      summary: (r.summary || r.description || '').slice(0, 300) || null,
-      source_url: r.uri || r.url || `https://eur-lex.europa.eu/search.html?query=${encodeURIComponent(keyword)}`,
-      published_at: r.date || r.dateDocument || new Date().toISOString(),
-      country: 'EU'
-    }))
-  } catch (e) {
-    console.error('EUR-Lex 오류:', e.message)
-    return []
-  }
+  // TODO: SPARQL 연동 구현
+  // https://eur-lex.europa.eu/content/tools/webservices/SearchWebServiceUserManual_v2.00.pdf
+  console.log(`EUR-Lex: "${keyword}" — SPARQL 연동 미구현, 건너뜀`)
+  return []
 }
 
 async function getTrend(keyword) {
