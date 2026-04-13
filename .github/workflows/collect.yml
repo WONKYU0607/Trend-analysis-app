@@ -1,0 +1,43 @@
+name: 데이터 자동 수집 및 분석
+
+on:
+  schedule:
+    - cron: '0 21 * * *'
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  collect-papers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 논문 수집 (arXiv + OpenAlex)
+        run: |
+          curl -X POST "${{ secrets.VERCEL_URL }}/api/collect/arxiv" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+
+  collect-patents:
+    runs-on: ubuntu-latest
+    needs: collect-papers
+    steps:
+      - name: 특허 수집 (USPTO + EPO + KIPRIS)
+        run: |
+          curl -X POST "${{ secrets.VERCEL_URL }}/api/collect/patents" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+
+  collect-laws:
+    runs-on: ubuntu-latest
+    needs: collect-patents
+    steps:
+      - name: 법안 수집 (국회 + Congress + EUR-Lex)
+        run: |
+          curl -X POST "${{ secrets.VERCEL_URL }}/api/collect/laws" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+
+  analyze:
+    runs-on: ubuntu-latest
+    needs: collect-laws
+    steps:
+      - name: Claude AI 종합 분석
+        run: |
+          curl -X POST "${{ secrets.VERCEL_URL }}/api/analyze" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
