@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS — 기술 트렌드 예측</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117;
+  --bg2: #161820;
+  --bg3: #1e2030;
+  --surface: #242638;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #e8e9f0;
+  --text2: #8b8fa8;
+  --text3: #5a5e78;
+  --accent: #7c6aff;
+  --accent2: #a78bfa;
+  --teal: #2dd4bf;
+  --amber: #fbbf24;
+  --coral: #f87171;
+  --green: #34d399;
+  --serif: 'DM Serif Display', serif;
+  --sans: 'DM Sans', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content:'';
+  position:fixed;
+  top:-20%; left:-10%;
+  width:60%; height:60%;
+  background: radial-gradient(ellipse, rgba(124,106,255,0.07) 0%, transparent 70%);
+  pointer-events:none; z-index:0;
+}
+body::after {
+  content:'';
+  position:fixed;
+  bottom:-20%; right:-10%;
+  width:50%; height:50%;
+  background: radial-gradient(ellipse, rgba(45,212,191,0.04) 0%, transparent 70%);
+  pointer-events:none; z-index:0;
+}
+
+/* HEADER */
+header {
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  padding:0 24px; height:60px;
+  display:flex; align-items:center; justify-content:space-between;
+  background: rgba(15,17,23,0.88);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+.logo {
+  font-family: var(--serif);
+  font-size:22px; letter-spacing:0.08em;
+  background: linear-gradient(135deg, var(--text) 0%, var(--accent2) 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.logo-sub {
+  font-family: var(--mono);
+  font-size:9px; letter-spacing:0.18em;
+  color: var(--text3); display:block; margin-top:-3px;
+}
+nav { display:flex; gap:4px; }
+nav button {
+  background:none; border:none; color:var(--text2);
+  font-family:var(--sans); font-size:13px; font-weight:500;
+  padding:7px 14px; border-radius:8px; cursor:pointer;
+  transition:all 0.2s; letter-spacing:0.02em;
+}
+nav button:hover { background:var(--surface); color:var(--text); }
+nav button.active { background:var(--surface); color:var(--accent2); }
+
+/* PAGES */
+main { padding-top:60px; min-height:100vh; position:relative; z-index:1; }
+.page { display:none; animation: fadeUp 0.3s ease; }
+.page.active { display:block; }
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(10px); }
+  to { opacity:1; transform:translateY(0); }
+}
+
+/* HERO */
+.hero {
+  padding:56px 24px 36px;
+  max-width:1200px; margin:0 auto;
+}
+.hero-eyebrow {
+  font-family:var(--mono); font-size:11px; letter-spacing:0.2em;
+  color:var(--accent); text-transform:uppercase;
+  margin-bottom:18px; display:flex; align-items:center; gap:10px;
+}
+.hero-eyebrow::before {
+  content:''; width:24px; height:1px; background:var(--accent);
+}
+.hero h1 {
+  font-family:var(--serif);
+  font-size:clamp(34px,5vw,56px); line-height:1.1;
+  margin-bottom:16px;
+}
+.hero h1 em {
+  font-style:italic;
+  background:linear-gradient(135deg, var(--accent2) 0%, var(--teal) 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.hero p {
+  font-size:15px; color:var(--text2); line-height:1.75;
+  max-width:460px; font-weight:300;
+}
+
+/* STATS */
+.stats-row {
+  max-width:1200px; margin:0 auto 36px; padding:0 24px;
+  display:flex; gap:12px;
+}
+.stat-card {
+  flex:1; background:var(--bg2); border:1px solid var(--border);
+  border-radius:14px; padding:16px 20px;
+}
+.stat-num {
+  font-family:var(--mono); font-size:22px; font-weight:500;
+  color:var(--text); display:block; margin-bottom:4px;
+}
+.stat-lbl { font-size:11px; color:var(--text3); letter-spacing:0.04em; }
+
+/* SECTION */
+.section-hd {
+  max-width:1200px; margin:0 auto 18px; padding:0 24px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.section-title { font-family:var(--serif); font-size:22px; }
+.section-meta { font-family:var(--mono); font-size:11px; color:var(--text3); }
+
+/* GRID */
+.grid {
+  max-width:1200px; margin:0 auto; padding:0 24px 48px;
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px;
+}
+
+/* CARD */
+.card {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:16px; padding:22px; cursor:pointer;
+  transition:all 0.22s ease; position:relative; overflow:hidden;
+}
+.card::after {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,var(--accent),var(--teal));
+  opacity:0; transition:opacity 0.22s;
+}
+.card:hover { border-color:var(--border2); transform:translateY(-2px); background:var(--bg3); }
+.card:hover::after { opacity:1; }
+
+.card-top {
+  display:flex; align-items:flex-start;
+  justify-content:space-between; margin-bottom:14px;
+}
+.card-keyword {
+  font-family:var(--serif); font-size:19px; line-height:1.2;
+  text-transform:capitalize; padding-right:12px;
+}
+.score-pill {
+  flex-shrink:0; background:var(--surface); border-radius:10px;
+  padding:8px 12px; text-align:center; min-width:50px;
+}
+.score-pill .num {
+  font-family:var(--mono); font-size:17px; font-weight:500; line-height:1; display:block;
+}
+.score-pill .lbl { font-size:8px; color:var(--text3); letter-spacing:0.1em; margin-top:2px; }
+.s-high { color:var(--green); }
+.s-mid  { color:var(--amber); }
+.s-low  { color:var(--text2); }
+
+.card-summary {
+  font-size:13px; color:var(--text2); line-height:1.65; font-weight:300;
+  margin-bottom:14px;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+}
+.card-footer { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.tag {
+  font-family:var(--mono); font-size:10px; padding:3px 8px;
+  border-radius:5px; letter-spacing:0.04em; white-space:nowrap;
+}
+.t-sector  { background:rgba(124,106,255,0.12); color:var(--accent2); }
+.t-time    { background:rgba(45,212,191,0.08);  color:var(--teal); }
+.t-hi      { background:rgba(52,211,153,0.1);   color:var(--green); }
+.t-mid     { background:rgba(251,191,36,0.1);   color:var(--amber); }
+.t-lo      { background:rgba(139,143,168,0.1);  color:var(--text2); }
+.ev-dot {
+  margin-left:auto; font-size:11px; color:var(--text3);
+  display:flex; align-items:center; gap:5px;
+}
+.ev-dot::before {
+  content:''; width:5px; height:5px; border-radius:50%;
+  background:var(--accent); opacity:0.5;
+}
+
+/* SKELETON */
+.skel { background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:22px; height:190px; }
+.skel-line {
+  background:linear-gradient(90deg,var(--bg2) 25%,var(--bg3) 50%,var(--bg2) 75%);
+  background-size:200% 100%; animation:shim 1.6s infinite; border-radius:6px; margin-bottom:10px;
+}
+@keyframes shim { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* DETAIL */
+.detail-wrap { max-width:840px; margin:0 auto; padding:40px 24px; }
+.back-btn {
+  display:flex; align-items:center; gap:8px;
+  color:var(--text3); font-size:13px; cursor:pointer;
+  margin-bottom:32px; background:none; border:none;
+  font-family:var(--sans); transition:color 0.2s;
+}
+.back-btn:hover { color:var(--text); }
+.back-btn svg { width:15px; height:15px; }
+
+.detail-kw {
+  font-family:var(--serif); font-size:clamp(30px,5vw,46px);
+  text-transform:capitalize; margin-bottom:14px; line-height:1.1;
+}
+.detail-tags { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:28px; }
+
+.score-row {
+  display:flex; align-items:center; gap:22px;
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:16px; padding:20px 24px; margin-bottom:28px;
+}
+.ring-wrap { position:relative; width:70px; height:70px; flex-shrink:0; }
+.ring-wrap svg { transform:rotate(-90deg); }
+.ring-num {
+  position:absolute; inset:0; display:flex;
+  align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:17px; font-weight:500;
+}
+.score-desc h3 { font-size:14px; font-weight:500; margin-bottom:5px; }
+.score-desc p { font-size:13px; color:var(--text2); line-height:1.7; font-weight:300; }
+
+.report-block {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:16px; padding:24px; margin-bottom:20px;
+}
+.rb-title {
+  font-family:var(--mono); font-size:10px; letter-spacing:0.18em;
+  color:var(--accent); text-transform:uppercase;
+  margin-bottom:14px; display:flex; align-items:center; gap:10px;
+}
+.rb-title::after { content:''; flex:1; height:1px; background:var(--border); }
+.rb-text { font-size:14px; color:var(--text); line-height:1.8; font-weight:300; }
+.sig-list { list-style:none; display:flex; flex-direction:column; gap:9px; }
+.sig-list li {
+  display:flex; gap:10px; align-items:flex-start;
+  font-size:13px; color:var(--text2); line-height:1.6; font-weight:300;
+}
+.sig-list li::before { content:'→'; color:var(--accent); font-family:var(--mono); flex-shrink:0; }
+
+/* EVIDENCE */
+.ev-section { margin-bottom:32px; }
+.ev-tabs {
+  display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:14px;
+}
+.ev-tab {
+  background:none; border:none; border-bottom:2px solid transparent;
+  color:var(--text3); font-family:var(--sans); font-size:13px; font-weight:500;
+  padding:8px 14px; cursor:pointer; transition:all 0.2s; margin-bottom:-1px;
+}
+.ev-tab:hover { color:var(--text2); }
+.ev-tab.active { color:var(--text); border-bottom-color:var(--accent); }
+.ev-tab .cnt {
+  font-family:var(--mono); font-size:10px;
+  background:var(--surface); padding:1px 5px; border-radius:4px;
+  margin-left:5px; color:var(--text3);
+}
+.ev-list { display:flex; flex-direction:column; gap:9px; }
+.ev-item {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; padding:15px 17px;
+  transition:border-color 0.2s; cursor:pointer;
+}
+.ev-item:hover { border-color:var(--border2); }
+.ev-item-title { font-size:13px; color:var(--text); font-weight:500; line-height:1.45; margin-bottom:7px; }
+.ev-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.ev-src {
+  font-family:var(--mono); font-size:10px;
+  background:rgba(124,106,255,0.1); color:var(--accent2); padding:2px 7px; border-radius:4px;
+}
+.ev-country { font-size:11px; color:var(--text3); }
+.ev-date { font-size:11px; color:var(--text3); margin-left:auto; }
+.ev-sum { font-size:12px; color:var(--text2); line-height:1.6; font-weight:300; margin-top:7px; }
+.ev-link { font-size:11px; color:var(--accent); font-family:var(--mono); margin-top:7px; }
+
+/* SEARCH */
+.search-wrap { max-width:720px; margin:0 auto; padding:48px 24px; }
+.search-wrap h2 { font-family:var(--serif); font-size:30px; margin-bottom:6px; }
+.search-wrap > p { color:var(--text2); font-size:14px; font-weight:300; margin-bottom:28px; }
+.search-box { position:relative; margin-bottom:20px; }
+.search-box input {
+  width:100%; background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; padding:15px 18px 15px 46px;
+  color:var(--text); font-family:var(--sans); font-size:15px; outline:none;
+  transition:border-color 0.2s;
+}
+.search-box input::placeholder { color:var(--text3); }
+.search-box input:focus { border-color:var(--accent); }
+.si { position:absolute; left:15px; top:50%; transform:translateY(-50%); color:var(--text3); width:18px; height:18px; }
+.qtags { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:28px; }
+.qtag {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:20px; padding:6px 13px; font-size:12px;
+  color:var(--text2); cursor:pointer; transition:all 0.2s; font-family:var(--sans);
+}
+.qtag:hover { border-color:var(--accent); color:var(--accent2); background:rgba(124,106,255,0.08); }
+
+/* ALERTS */
+.alert-wrap { max-width:600px; margin:0 auto; padding:48px 24px; }
+.alert-wrap h2 { font-family:var(--serif); font-size:30px; margin-bottom:6px; }
+.alert-wrap > p { color:var(--text2); font-size:14px; font-weight:300; margin-bottom:28px; }
+.input-row { display:flex; gap:10px; margin-bottom:28px; }
+.input-row input {
+  flex:1; background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; padding:13px 17px; color:var(--text);
+  font-family:var(--sans); font-size:14px; outline:none; transition:border-color 0.2s;
+}
+.input-row input::placeholder { color:var(--text3); }
+.input-row input:focus { border-color:var(--accent); }
+.btn-add {
+  background:linear-gradient(135deg,var(--accent),#6857e8);
+  border:none; border-radius:12px; padding:13px 20px;
+  color:#fff; font-family:var(--sans); font-size:14px; font-weight:500;
+  cursor:pointer; white-space:nowrap; transition:opacity 0.2s;
+}
+.btn-add:hover { opacity:0.85; }
+.al-list { display:flex; flex-direction:column; gap:9px; }
+.al-item {
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; padding:13px 17px;
+}
+.al-kw { font-size:14px; font-weight:500; text-transform:capitalize; }
+.al-rm {
+  background:none; border:none; color:var(--text3);
+  font-size:18px; cursor:pointer; transition:color 0.2s; line-height:1; padding:0 3px;
+}
+.al-rm:hover { color:var(--coral); }
+
+/* EMPTY */
+.empty { text-align:center; padding:56px 24px; color:var(--text3); }
+.empty .ico { font-size:36px; margin-bottom:14px; opacity:0.35; }
+.empty p { font-size:13px; line-height:1.7; font-weight:300; }
+
+/* TOAST */
+.toast {
+  position:fixed; bottom:24px; left:50%;
+  transform:translateX(-50%) translateY(80px);
+  background:var(--surface); border:1px solid var(--border2);
+  border-radius:12px; padding:11px 20px;
+  font-size:13px; color:var(--text); z-index:999;
+  transition:transform 0.28s ease; white-space:nowrap;
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+@media(max-width:640px){
+  .grid { grid-template-columns:1fr; }
+  .stats-row { display:none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">ATLAS<span class="logo-sub">기술 트렌드 예측 플랫폼</span></div>
+  </div>
+  <nav>
+    <button class="active" onclick="gotoPage('home',this)">홈</button>
+    <button onclick="gotoPage('search',this)">탐색</button>
+    <button onclick="gotoPage('alerts',this)">알림</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- 홈 -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <div class="hero-eyebrow">실시간 글로벌 기술 신호 분석</div>
+    <h1>미래 기술의 <em>흐름</em>을<br>먼저 읽습니다</h1>
+    <p>논문·특허·법안·정책을 교차 분석해 유망 기술을 예측합니다.<br>미국·유럽·한국·일본 데이터를 매일 자동 수집합니다.</p>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card"><span class="stat-num" id="sT">—</span><div class="stat-lbl">추적 트렌드</div></div>
+    <div class="stat-card"><span class="stat-num" id="sE">—</span><div class="stat-lbl">수집 근거자료</div></div>
+    <div class="stat-card"><span class="stat-num">4개국</span><div class="stat-lbl">글로벌 커버리지</div></div>
+    <div class="stat-card"><span class="stat-num">매일</span><div class="stat-lbl">자동 업데이트</div></div>
+  </div>
+  <div class="section-hd">
+    <div class="section-title">주목할 기술 트렌드</div>
+    <div class="section-meta" id="upd">로딩 중...</div>
+  </div>
+  <div class="grid" id="homeGrid">
+    <div class="skel"><div class="skel-line" style="height:18px;width:55%"></div><div class="skel-line" style="height:13px;width:100%"></div><div class="skel-line" style="height:13px;width:75%"></div></div>
+    <div class="skel"><div class="skel-line" style="height:18px;width:48%"></div><div class="skel-line" style="height:13px;width:100%"></div><div class="skel-line" style="height:13px;width:82%"></div></div>
+    <div class="skel"><div class="skel-line" style="height:18px;width:62%"></div><div class="skel-line" style="height:13px;width:100%"></div><div class="skel-line" style="height:13px;width:68%"></div></div>
+  </div>
+</div>
+
+<!-- 상세 -->
+<div id="page-detail" class="page">
+  <div class="detail-wrap">
+    <button class="back-btn" onclick="gotoPage('home',document.querySelector('nav button'))">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      목록으로 돌아가기
+    </button>
+    <div id="detailBody"></div>
+  </div>
+</div>
+
+<!-- 탐색 -->
+<div id="page-search" class="page">
+  <div class="search-wrap">
+    <h2>기술 탐색</h2>
+    <p>관심 기술 키워드를 검색하거나 아래 태그를 눌러보세요.</p>
+    <div class="search-box">
+      <svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="searchInput" placeholder="예: quantum computing, 반도체, 바이오..." oninput="doSearch(this.value)">
+    </div>
+    <div class="qtags" id="qtags"></div>
+    <div class="grid" style="padding:0" id="searchGrid"></div>
+  </div>
+</div>
+
+<!-- 알림 -->
+<div id="page-alerts" class="page">
+  <div class="alert-wrap">
+    <h2>관심 알림</h2>
+    <p>키워드를 등록하면 새 데이터 수집 시 먼저 확인할 수 있어요.</p>
+    <div class="input-row">
+      <input id="alertInput" placeholder="키워드 입력 (예: 양자컴퓨팅, AI, 우주...)" onkeydown="if(event.key==='Enter')addAlert()">
+      <button class="btn-add" onclick="addAlert()">등록</button>
+    </div>
+    <div class="al-list" id="alList"></div>
+  </div>
+</div>
+
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '/api/trends'
+let allTrends = [], alerts = JSON.parse(localStorage.getItem('atlas_al')||'[]')
+let searchTimer
+
+/* 페이지 전환 */
+function gotoPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'))
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'))
+  document.getElementById('page-'+name).classList.add('active')
+  if(btn) btn.classList.add('active')
+  if(name==='alerts') renderAlerts()
+}
+
+/* 점수 클래스 */
+function sc(s){ return s>=70?'s-high':s>=40?'s-mid':'s-low' }
+/* 신뢰도 태그 */
+function confTag(c){
+  if(c==='high') return '<span class="tag t-hi">신뢰도 높음</span>'
+  if(c==='medium') return '<span class="tag t-mid">신뢰도 중간</span>'
+  return '<span class="tag t-lo">신뢰도 낮음</span>'
+}
+/* 국가 이모지 */
+const flags = {KR:'🇰🇷',US:'🇺🇸',EU:'🇪🇺',JP:'🇯🇵',global:'🌐'}
+
+/* 카드 렌더 */
+function mkCard(t, clickFn) {
+  const r = t.reports?.[0]||{}
+  const s = Math.round(t.score||0)
+  const sum = r.summary || '분석 리포트 생성 중...'
+  return `
+  <div class="card" onclick="${clickFn}">
+    <div class="card-top">
+      <div class="card-keyword">${t.keyword}</div>
+      <div class="score-pill">
+        <span class="num ${sc(s)}">${s}</span>
+        <div class="lbl">SCORE</div>
+      </div>
+    </div>
+    <div class="card-summary">${sum}</div>
+    <div class="card-footer">
+      ${r.sector?`<span class="tag t-sector">${r.sector}</span>`:''}
+      ${r.time_horizon?`<span class="tag t-time">${r.time_horizon}</span>`:''}
+      ${confTag(t.confidence_level)}
+      <span class="ev-dot">근거자료</span>
+    </div>
+  </div>`
+}
+
+/* 상세 */
+async function openDetail(id) {
+  gotoPage('detail', null)
+  document.getElementById('detailBody').innerHTML =
+    `<div class="skel-line" style="height:46px;width:55%;border-radius:8px;margin-bottom:16px;background:var(--bg3)"></div>
+     <div class="skel-line" style="height:90px;border-radius:16px;margin-bottom:20px;background:var(--bg2)"></div>
+     <div class="skel-line" style="height:140px;border-radius:16px;background:var(--bg2)"></div>`
+  try {
+    const res = await fetch(`${API}?id=${id}`)
+    const {trend, report, evidence} = await res.json()
+    const s = Math.round(trend.score||0)
+    const col = s>=70?'var(--green)':s>=40?'var(--amber)':'var(--text2)'
+    const R=32, C=2*Math.PI*R, dash=(s/100)*C
+    const rep = report?.evidence_summary||{}
+    const signals = rep.key_signals||[]
+    const risks = rep.risk_factors||[]
+    const countries = rep.countries_leading||[]
+    const allEv = Object.values(evidence||{}).flat()
+    const cnt = tp=>(evidence?.[tp]||[]).length
+    const types=[{k:'paper',l:'논문'},{k:'patent',l:'특허'},{k:'law',l:'법안'},{k:'policy',l:'정책'},{k:'news',l:'뉴스'}]
+
+    document.getElementById('detailBody').innerHTML = `
+    <div class="detail-kw">${trend.keyword}</div>
+    <div class="detail-tags">
+      ${report?.sector?`<span class="tag t-sector">${report.sector}</span>`:''}
+      ${report?.time_horizon?`<span class="tag t-time">${report.time_horizon}</span>`:''}
+      ${confTag(trend.confidence_level)}
+      ${countries.map(c=>`<span class="tag" style="background:rgba(45,212,191,0.08);color:var(--teal)">${c}</span>`).join('')}
+    </div>
+
+    <div class="score-row">
+      <div class="ring-wrap">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <circle cx="35" cy="35" r="${R}" fill="none" stroke="var(--surface)" stroke-width="5.5"/>
+          <circle cx="35" cy="35" r="${R}" fill="none" stroke="${col}" stroke-width="5.5"
+            stroke-dasharray="${dash} ${C}" stroke-linecap="round"/>
+        </svg>
+        <div class="ring-num" style="color:${col}">${s}</div>
+      </div>
+      <div class="score-desc">
+        <h3>트렌드 점수 ${s}/100</h3>
+        <p>${report?.summary||'분석 데이터를 로딩 중입니다.'}</p>
+      </div>
+    </div>
+
+    ${report?.prediction?`
+    <div class="report-block">
+      <div class="rb-title">AI 예측 분석</div>
+      <div class="rb-text">${report.prediction}</div>
+    </div>`:''}
+
+    ${signals.length?`
+    <div class="report-block">
+      <div class="rb-title">핵심 신호</div>
+      <ul class="sig-list">${signals.map(x=>`<li>${x}</li>`).join('')}</ul>
+    </div>`:''}
+
+    ${risks.length?`
+    <div class="report-block">
+      <div class="rb-title">리스크 요인</div>
+      <ul class="sig-list">${risks.map(x=>`<li>${x}</li>`).join('')}</ul>
+    </div>`:''}
+
+    <div class="ev-section">
+      <div class="ev-tabs" id="evTabs">
+        <button class="ev-tab active" onclick="switchEv('all',this)">전체 <span class="cnt">${allEv.length}</span></button>
+        ${types.filter(t=>cnt(t.k)>0).map(t=>`<button class="ev-tab" onclick="switchEv('${t.k}',this)">${t.l} <span class="cnt">${cnt(t.k)}</span></button>`).join('')}
+      </div>
+      <div class="ev-list" id="evList">${mkEvList(allEv)}</div>
+    </div>`
+
+    window._ev = evidence
+  } catch(e){ toast('데이터를 불러오지 못했습니다') }
+}
+
+function mkEvList(items) {
+  if(!items.length) return `<div class="empty"><div class="ico">📭</div><p>근거 자료가 없습니다</p></div>`
+  return items.slice(0,20).map(e=>{
+    const d = e.published_at ? new Date(e.published_at).toLocaleDateString('ko-KR') : ''
+    const flag = flags[e.country]||'🌐'
+    return `
+    <div class="ev-item" onclick="${e.source_url?`window.open('${e.source_url}','_blank')`:''}">
+      <div class="ev-item-title">${e.title}</div>
+      <div class="ev-meta">
+        ${e.source_name?`<span class="ev-src">${e.source_name}</span>`:''}
+        <span class="ev-country">${flag} ${e.country||'Global'}</span>
+        ${d?`<span class="ev-date">${d}</span>`:''}
+      </div>
+      ${e.summary?`<div class="ev-sum">${e.summary}</div>`:''}
+      ${e.source_url?`<div class="ev-link">원문 보기 →</div>`:''}
+    </div>`
+  }).join('')
+}
+
+function switchEv(type, btn) {
+  document.querySelectorAll('.ev-tab').forEach(b=>b.classList.remove('active'))
+  btn.classList.add('active')
+  const items = type==='all' ? Object.values(window._ev||{}).flat() : (window._ev?.[type]||[])
+  document.getElementById('evList').innerHTML = mkEvList(items)
+}
+
+/* 검색 */
+function doSearch(val) {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(()=>{
+    const q = val.toLowerCase().trim()
+    const grid = document.getElementById('searchGrid')
+    if(!q){ grid.innerHTML=''; return }
+    const res = allTrends.filter(t=>t.keyword.toLowerCase().includes(q))
+    grid.innerHTML = res.length
+      ? res.map(t=>mkCard(t,`openDetail('${t.id}')`)).join('')
+      : `<div class="empty" style="grid-column:1/-1"><div class="ico">🔍</div><p>검색 결과가 없습니다</p></div>`
+  }, 280)
+}
+
+/* 알림 */
+function renderAlerts() {
+  const el = document.getElementById('alList')
+  if(!alerts.length){
+    el.innerHTML=`<div class="empty"><div class="ico">🔔</div><p>등록된 알림이 없습니다<br>관심 기술 키워드를 등록해보세요</p></div>`
+    return
+  }
+  el.innerHTML = alerts.map((a,i)=>`
+    <div class="al-item">
+      <span class="al-kw">${a}</span>
+      <button class="al-rm" onclick="rmAlert(${i})">×</button>
+    </div>`).join('')
+}
+function addAlert(){
+  const inp = document.getElementById('alertInput')
+  const v = inp.value.trim()
+  if(!v) return
+  if(alerts.includes(v)){ toast('이미 등록된 키워드입니다'); return }
+  alerts.push(v); localStorage.setItem('atlas_al',JSON.stringify(alerts))
+  inp.value=''; renderAlerts(); toast('알림이 등록되었습니다 🔔')
+}
+function rmAlert(i){
+  alerts.splice(i,1); localStorage.setItem('atlas_al',JSON.stringify(alerts)); renderAlerts()
+}
+
+/* 토스트 */
+function toast(msg){
+  const el=document.getElementById('toast')
+  el.textContent=msg; el.classList.add('show')
+  setTimeout(()=>el.classList.remove('show'),2600)
+}
+
+/* 데이터 로드 */
+async function loadHome() {
+  try {
+    const res = await fetch(API)
+    const {trends} = await res.json()
+    allTrends = trends||[]
+    document.getElementById('sT').textContent = allTrends.length
+    document.getElementById('sE').textContent = (allTrends.length*16)+' +'
+    document.getElementById('upd').textContent = '오늘 업데이트'
+    const grid = document.getElementById('homeGrid')
+    if(!allTrends.length){
+      grid.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="ico">📡</div><p>데이터 수집 중입니다<br>잠시 후 다시 확인해주세요</p></div>`
+      return
+    }
+    grid.innerHTML = allTrends.map(t=>mkCard(t,`openDetail('${t.id}')`)).join('')
+    document.getElementById('qtags').innerHTML = allTrends.slice(0,8).map(t=>
+      `<button class="qtag" onclick="document.getElementById('searchInput').value='${t.keyword}';doSearch('${t.keyword}')">${t.keyword}</button>`
+    ).join('')
+  } catch(e){
+    document.getElementById('homeGrid').innerHTML=
+      `<div class="empty" style="grid-column:1/-1"><div class="ico">⚠️</div><p>데이터를 불러오지 못했습니다</p></div>`
+  }
+}
+
+renderAlerts()
+loadHome()
+</script>
+</body>
+</html>
