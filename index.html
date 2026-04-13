@@ -183,6 +183,16 @@ main { padding-top:60px; min-height:100vh; position:relative; z-index:1; }
 .s-mid  { color:var(--amber); }
 .s-low  { color:var(--text2); }
 
+/* ★ weekly_change 배지 */
+.change-badge {
+  font-family:var(--mono); font-size:10px;
+  padding:2px 6px; border-radius:4px;
+  display:inline-block; margin-top:3px;
+}
+.change-up   { color:var(--green); background:rgba(52,211,153,0.1); }
+.change-down { color:var(--coral); background:rgba(248,113,113,0.1); }
+.change-flat { color:var(--text3); background:rgba(139,143,168,0.08); }
+
 .card-summary {
   font-size:13px; color:var(--text2); line-height:1.65; font-weight:300;
   margin-bottom:14px;
@@ -263,7 +273,7 @@ main { padding-top:60px; min-height:100vh; position:relative; z-index:1; }
   display:flex; gap:10px; align-items:flex-start;
   font-size:13px; color:var(--text2); line-height:1.6; font-weight:300;
 }
-.sig-list li::before { content:'→'; color:var(--accent); font-family:var(--mono); flex-shrink:0; }
+.sig-list li::before { content:'\2192'; color:var(--accent); font-family:var(--mono); flex-shrink:0; }
 
 /* EVIDENCE */
 .ev-section { margin-bottom:32px; }
@@ -396,12 +406,12 @@ main { padding-top:60px; min-height:100vh; position:relative; z-index:1; }
   <div class="hero">
     <div class="hero-eyebrow">실시간 글로벌 기술 신호 분석</div>
     <h1>미래 기술의 <em>흐름</em>을<br>먼저 읽습니다</h1>
-    <p>논문·특허·법안·정책을 교차 분석해 유망 기술을 예측합니다.<br>미국·유럽·한국·일본 데이터를 매일 자동 수집합니다.</p>
+    <p>논문·특허·법안·정책을 교차 분석해 유망 기술을 예측합니다.<br>미국·유럽·한국 데이터를 매일 자동 수집합니다.</p>
   </div>
   <div class="stats-row">
     <div class="stat-card"><span class="stat-num" id="sT">—</span><div class="stat-lbl">추적 트렌드</div></div>
     <div class="stat-card"><span class="stat-num" id="sE">—</span><div class="stat-lbl">수집 근거자료</div></div>
-    <div class="stat-card"><span class="stat-num">4개국</span><div class="stat-lbl">글로벌 커버리지</div></div>
+    <div class="stat-card"><span class="stat-num" id="sC">—</span><div class="stat-lbl">글로벌 커버리지</div></div>
     <div class="stat-card"><span class="stat-num">매일</span><div class="stat-lbl">자동 업데이트</div></div>
   </div>
   <div class="section-hd">
@@ -461,6 +471,16 @@ const API = '/api/trends'
 let allTrends = [], alerts = JSON.parse(localStorage.getItem('atlas_al')||'[]')
 let searchTimer
 
+/* ── 유틸 ── */
+
+// XSS 방지
+function esc(str) {
+  if (!str) return ''
+  const d = document.createElement('div')
+  d.textContent = str
+  return d.innerHTML
+}
+
 /* 페이지 전환 */
 function gotoPage(name, btn) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'))
@@ -472,40 +492,51 @@ function gotoPage(name, btn) {
 
 /* 점수 클래스 */
 function sc(s){ return s>=70?'s-high':s>=40?'s-mid':'s-low' }
+
 /* 신뢰도 태그 */
 function confTag(c){
   if(c==='high') return '<span class="tag t-hi">신뢰도 높음</span>'
   if(c==='medium') return '<span class="tag t-mid">신뢰도 중간</span>'
   return '<span class="tag t-lo">신뢰도 낮음</span>'
 }
+
+/* ★ weekly_change 배지 */
+function changeBadge(val) {
+  const v = Math.round(val || 0)
+  if (v > 0) return `<span class="change-badge change-up">+${v}</span>`
+  if (v < 0) return `<span class="change-badge change-down">${v}</span>`
+  return `<span class="change-badge change-flat">-</span>`
+}
+
 /* 국가 이모지 */
 const flags = {KR:'🇰🇷',US:'🇺🇸',EU:'🇪🇺',JP:'🇯🇵',global:'🌐'}
 
-/* 카드 렌더 */
+/* ── 카드 렌더 ── */
 function mkCard(t, clickFn) {
   const r = t.reports?.[0]||{}
   const s = Math.round(t.score||0)
-  const sum = r.summary || '분석 리포트 생성 중...'
+  const sum = esc(r.summary || '분석 리포트 생성 중...')
   return `
   <div class="card" onclick="${clickFn}">
     <div class="card-top">
-      <div class="card-keyword">${t.keyword}</div>
+      <div class="card-keyword">${esc(t.keyword)}</div>
       <div class="score-pill">
         <span class="num ${sc(s)}">${s}</span>
         <div class="lbl">SCORE</div>
+        ${changeBadge(t.weekly_change)}
       </div>
     </div>
     <div class="card-summary">${sum}</div>
     <div class="card-footer">
-      ${r.sector?`<span class="tag t-sector">${r.sector}</span>`:''}
-      ${r.time_horizon?`<span class="tag t-time">${r.time_horizon}</span>`:''}
+      ${r.sector?`<span class="tag t-sector">${esc(r.sector)}</span>`:''}
+      ${r.time_horizon?`<span class="tag t-time">${esc(r.time_horizon)}</span>`:''}
       ${confTag(t.confidence_level)}
       <span class="ev-dot">근거자료</span>
     </div>
   </div>`
 }
 
-/* 상세 */
+/* ── 상세 ── */
 async function openDetail(id) {
   gotoPage('detail', null)
   document.getElementById('detailBody').innerHTML =
@@ -527,12 +558,12 @@ async function openDetail(id) {
     const types=[{k:'paper',l:'논문'},{k:'patent',l:'특허'},{k:'law',l:'법안'},{k:'policy',l:'정책'},{k:'news',l:'뉴스'}]
 
     document.getElementById('detailBody').innerHTML = `
-    <div class="detail-kw">${trend.keyword}</div>
+    <div class="detail-kw">${esc(trend.keyword)}</div>
     <div class="detail-tags">
-      ${report?.sector?`<span class="tag t-sector">${report.sector}</span>`:''}
-      ${report?.time_horizon?`<span class="tag t-time">${report.time_horizon}</span>`:''}
+      ${report?.sector?`<span class="tag t-sector">${esc(report.sector)}</span>`:''}
+      ${report?.time_horizon?`<span class="tag t-time">${esc(report.time_horizon)}</span>`:''}
       ${confTag(trend.confidence_level)}
-      ${countries.map(c=>`<span class="tag" style="background:rgba(45,212,191,0.08);color:var(--teal)">${c}</span>`).join('')}
+      ${countries.map(c=>`<span class="tag" style="background:rgba(45,212,191,0.08);color:var(--teal)">${esc(c)}</span>`).join('')}
     </div>
 
     <div class="score-row">
@@ -545,27 +576,27 @@ async function openDetail(id) {
         <div class="ring-num" style="color:${col}">${s}</div>
       </div>
       <div class="score-desc">
-        <h3>트렌드 점수 ${s}/100</h3>
-        <p>${report?.summary||'분석 데이터를 로딩 중입니다.'}</p>
+        <h3>트렌드 점수 ${s}/100 ${changeBadge(trend.weekly_change)}</h3>
+        <p>${esc(report?.summary||'분석 데이터를 로딩 중입니다.')}</p>
       </div>
     </div>
 
     ${report?.prediction?`
     <div class="report-block">
       <div class="rb-title">AI 예측 분석</div>
-      <div class="rb-text">${report.prediction}</div>
+      <div class="rb-text">${esc(report.prediction)}</div>
     </div>`:''}
 
     ${signals.length?`
     <div class="report-block">
       <div class="rb-title">핵심 신호</div>
-      <ul class="sig-list">${signals.map(x=>`<li>${x}</li>`).join('')}</ul>
+      <ul class="sig-list">${signals.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
     </div>`:''}
 
     ${risks.length?`
     <div class="report-block">
       <div class="rb-title">리스크 요인</div>
-      <ul class="sig-list">${risks.map(x=>`<li>${x}</li>`).join('')}</ul>
+      <ul class="sig-list">${risks.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
     </div>`:''}
 
     <div class="ev-section">
@@ -585,16 +616,17 @@ function mkEvList(items) {
   return items.slice(0,20).map(e=>{
     const d = e.published_at ? new Date(e.published_at).toLocaleDateString('ko-KR') : ''
     const flag = flags[e.country]||'🌐'
+    const url = e.source_url ? esc(e.source_url) : ''
     return `
-    <div class="ev-item" onclick="${e.source_url?`window.open('${e.source_url}','_blank')`:''}">
-      <div class="ev-item-title">${e.title}</div>
+    <div class="ev-item" ${url ? `onclick="window.open('${url}','_blank')"` : ''}>
+      <div class="ev-item-title">${esc(e.title)}</div>
       <div class="ev-meta">
-        ${e.source_name?`<span class="ev-src">${e.source_name}</span>`:''}
-        <span class="ev-country">${flag} ${e.country||'Global'}</span>
+        ${e.source_name?`<span class="ev-src">${esc(e.source_name)}</span>`:''}
+        <span class="ev-country">${flag} ${esc(e.country||'Global')}</span>
         ${d?`<span class="ev-date">${d}</span>`:''}
       </div>
-      ${e.summary?`<div class="ev-sum">${e.summary}</div>`:''}
-      ${e.source_url?`<div class="ev-link">원문 보기 →</div>`:''}
+      ${e.summary?`<div class="ev-sum">${esc(e.summary)}</div>`:''}
+      ${url?`<div class="ev-link">원문 보기 →</div>`:''}
     </div>`
   }).join('')
 }
@@ -606,7 +638,7 @@ function switchEv(type, btn) {
   document.getElementById('evList').innerHTML = mkEvList(items)
 }
 
-/* 검색 */
+/* ── 검색 ── */
 function doSearch(val) {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(()=>{
@@ -620,7 +652,7 @@ function doSearch(val) {
   }, 280)
 }
 
-/* 알림 */
+/* ── 알림 ── */
 function renderAlerts() {
   const el = document.getElementById('alList')
   if(!alerts.length){
@@ -629,7 +661,7 @@ function renderAlerts() {
   }
   el.innerHTML = alerts.map((a,i)=>`
     <div class="al-item">
-      <span class="al-kw">${a}</span>
+      <span class="al-kw">${esc(a)}</span>
       <button class="al-rm" onclick="rmAlert(${i})">×</button>
     </div>`).join('')
 }
@@ -639,28 +671,42 @@ function addAlert(){
   if(!v) return
   if(alerts.includes(v)){ toast('이미 등록된 키워드입니다'); return }
   alerts.push(v); localStorage.setItem('atlas_al',JSON.stringify(alerts))
-  inp.value=''; renderAlerts(); toast('알림이 등록되었습니다 🔔')
+  inp.value=''; renderAlerts(); toast('알림이 등록되었습니다')
 }
 function rmAlert(i){
   alerts.splice(i,1); localStorage.setItem('atlas_al',JSON.stringify(alerts)); renderAlerts()
 }
 
-/* 토스트 */
+/* ── 토스트 ── */
 function toast(msg){
   const el=document.getElementById('toast')
   el.textContent=msg; el.classList.add('show')
   setTimeout(()=>el.classList.remove('show'),2600)
 }
 
-/* 데이터 로드 */
+/* ── 데이터 로드 ── */
 async function loadHome() {
   try {
     const res = await fetch(API)
-    const {trends} = await res.json()
-    allTrends = trends||[]
-    document.getElementById('sT').textContent = allTrends.length
-    document.getElementById('sE').textContent = (allTrends.length*16)+' +'
-    document.getElementById('upd').textContent = '오늘 업데이트'
+    const data = await res.json()
+    allTrends = data.trends || []
+    const stats = data.stats || {}
+
+    // ★ 실제 DB 통계 표시
+    document.getElementById('sT').textContent = stats.trendCount || allTrends.length
+    document.getElementById('sE').textContent = (stats.evidenceCount || 0).toLocaleString()
+    document.getElementById('sC').textContent = stats.countryCount
+      ? `${stats.countryCount}개국`
+      : '—'
+
+    // 업데이트 시간
+    if (allTrends.length && allTrends[0].updated_at) {
+      const d = new Date(allTrends[0].updated_at)
+      document.getElementById('upd').textContent = d.toLocaleDateString('ko-KR') + ' 업데이트'
+    } else {
+      document.getElementById('upd').textContent = '대기 중'
+    }
+
     const grid = document.getElementById('homeGrid')
     if(!allTrends.length){
       grid.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="ico">📡</div><p>데이터 수집 중입니다<br>잠시 후 다시 확인해주세요</p></div>`
@@ -668,9 +714,10 @@ async function loadHome() {
     }
     grid.innerHTML = allTrends.map(t=>mkCard(t,`openDetail('${t.id}')`)).join('')
     document.getElementById('qtags').innerHTML = allTrends.slice(0,8).map(t=>
-      `<button class="qtag" onclick="document.getElementById('searchInput').value='${t.keyword}';doSearch('${t.keyword}')">${t.keyword}</button>`
+      `<button class="qtag" onclick="document.getElementById('searchInput').value='${esc(t.keyword)}';doSearch('${esc(t.keyword)}')">${esc(t.keyword)}</button>`
     ).join('')
   } catch(e){
+    console.error('loadHome error:', e)
     document.getElementById('homeGrid').innerHTML=
       `<div class="empty" style="grid-column:1/-1"><div class="ico">⚠️</div><p>데이터를 불러오지 못했습니다</p></div>`
   }

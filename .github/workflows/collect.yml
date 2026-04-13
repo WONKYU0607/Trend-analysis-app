@@ -2,42 +2,92 @@ name: 데이터 자동 수집 및 분석
 
 on:
   schedule:
-    - cron: '0 21 * * *'
-    - cron: '0 9 * * *'
-  workflow_dispatch:
+    - cron: '0 21 * * *'   # 매일 오전 6시 KST
+    - cron: '0 9 * * *'    # 매일 오후 6시 KST (추가 수집)
+  workflow_dispatch:         # 수동 실행
 
 jobs:
   collect-papers:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: 논문 수집 (arXiv + OpenAlex)
         run: |
-          curl -X POST "${{ secrets.VERCEL_URL }}/api/collect/arxiv" \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+          response=$(curl -sf -w "\n%{http_code}" -X POST \
+            "${{ secrets.VERCEL_URL }}/api/collect/arxiv" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            --max-time 120)
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+          echo "Status: $http_code"
+          echo "$body"
+          if [ "$http_code" -ge 400 ]; then exit 1; fi
 
   collect-patents:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: collect-papers
     steps:
       - name: 특허 수집 (USPTO + EPO + KIPRIS)
         run: |
-          curl -X POST "${{ secrets.VERCEL_URL }}/api/collect/patents" \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+          response=$(curl -sf -w "\n%{http_code}" -X POST \
+            "${{ secrets.VERCEL_URL }}/api/collect/patents" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            --max-time 120)
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+          echo "Status: $http_code"
+          echo "$body"
+          if [ "$http_code" -ge 400 ]; then exit 1; fi
 
   collect-laws:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: collect-patents
     steps:
       - name: 법안 수집 (국회 + Congress + EUR-Lex)
         run: |
-          curl -X POST "${{ secrets.VERCEL_URL }}/api/collect/laws" \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+          response=$(curl -sf -w "\n%{http_code}" -X POST \
+            "${{ secrets.VERCEL_URL }}/api/collect/laws" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            --max-time 120)
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+          echo "Status: $http_code"
+          echo "$body"
+          if [ "$http_code" -ge 400 ]; then exit 1; fi
 
-  analyze:
+  # ★ 분석을 2회 실행하여 BATCH_SIZE(5개)씩 처리 → 10개 커버
+  analyze-batch-1:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     needs: collect-laws
     steps:
-      - name: Claude AI 종합 분석
+      - name: Claude AI 종합 분석 (배치 1/2)
         run: |
-          curl -X POST "${{ secrets.VERCEL_URL }}/api/analyze" \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+          response=$(curl -sf -w "\n%{http_code}" -X POST \
+            "${{ secrets.VERCEL_URL }}/api/analyze" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            --max-time 120)
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+          echo "Status: $http_code"
+          echo "$body"
+          if [ "$http_code" -ge 400 ]; then exit 1; fi
+
+  analyze-batch-2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: analyze-batch-1
+    steps:
+      - name: Claude AI 종합 분석 (배치 2/2)
+        run: |
+          response=$(curl -sf -w "\n%{http_code}" -X POST \
+            "${{ secrets.VERCEL_URL }}/api/analyze" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            --max-time 120)
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+          echo "Status: $http_code"
+          echo "$body"
+          if [ "$http_code" -ge 400 ]; then exit 1; fi

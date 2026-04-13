@@ -8,55 +8,91 @@ const supabase = createClient(
 const KR_KEYWORDS = ['인공지능', '반도체', '양자', '바이오', '우주', '로봇', '신재생에너지']
 const US_KEYWORDS = ['artificial intelligence', 'semiconductor', 'quantum', 'biotechnology', 'clean energy']
 
+function regionOf(country) {
+  const map = { KR: 'Asia', US: 'Americas', EU: 'Europe' }
+  return map[country] || 'Global'
+}
+
+// ── 한국 국회 법안 ──
 async function fetchKoreanLaws(keyword) {
+  if (!process.env.ASSEMBLY_KEY) {
+    console.warn('ASSEMBLY_KEY 미설정 — 국회 법안 수집 건너뜀')
+    return []
+  }
+
   const url = `https://open.assembly.go.kr/portal/openapi/nzmimeepazxkubdpn?KEY=${process.env.ASSEMBLY_KEY}&Type=json&pIndex=1&pSize=10&BILL_NAME=${encodeURIComponent(keyword)}`
   try {
     const res = await fetch(url)
+    if (!res.ok) { console.error(`국회 API HTTP ${res.status}`); return [] }
     const data = await res.json()
     const bills = data?.nzmimeepazxkubdpn?.[1]?.row || []
     return bills.map(b => ({
       title: b.BILL_NAME,
-      summary: `${b.PROPOSER} 발의 · 상태: ${b.PROC_RESULT_CD}`,
+      summary: `${b.PROPOSER} 발의 · 상태: ${b.PROC_RESULT_CD || '진행중'}`,
       source_url: `https://likms.assembly.go.kr/bill/billDetail.do?billId=${b.BILL_ID}`,
-      published_at: b.PROPOSE_DT,
+      published_at: b.PROPOSE_DT || new Date().toISOString(),
       country: 'KR'
-    }))
+    })).filter(b => b.source_url)
   } catch (e) {
     console.error('국회 API 오류:', e.message)
     return []
   }
 }
 
+// ── 미국 Congress ──
 async function fetchUSLaws(keyword) {
+  if (!process.env.CONGRESS_KEY) {
+    console.warn('CONGRESS_KEY 미설정 — US 법안 수집 건너뜀')
+    return []
+  }
+
   const url = `https://api.congress.gov/v3/bill?query=${encodeURIComponent(keyword)}&sort=updateDate+desc&limit=10&api_key=${process.env.CONGRESS_KEY}`
   try {
     const res = await fetch(url)
+    if (!res.ok) { console.error(`Congress API HTTP ${res.status}`); return [] }
     const data = await res.json()
     return (data.bills || []).map(b => ({
-      title: b.title,
-      summary: `${b.type} ${b.number} · ${b.latestAction?.text || ''}`,
-      source_url: `https://www.congress.gov/bill/${b.congress}th-congress/${b.type?.toLowerCase()}/${b.number}`,
-      published_at: b.introducedDate,
+      title: b.title || '(Untitled Bill)',
+      summary: `${b.type || ''} ${b.number || ''} · ${b.latestAction?.text || ''}`.trim(),
+      source_url: b.number
+        ? `https://www.congress.gov/bill/${b.congress}th-congress/${(b.type || 'bill').toLowerCase()}/${b.number}`
+        : `https://www.congress.gov/search?q=${encodeURIComponent(keyword)}`,
+      published_at: b.introducedDate || new Date().toISOString(),
       country: 'US'
-    }))
+    })).filter(b => b.source_url)
   } catch (e) {
     console.error('Congress API 오류:', e.message)
     return []
   }
 }
 
+// ── EUR-Lex (유럽 법안) ──
+// ★ 수정: EUR-Lex REST API는 JSON format을 직접 지원하지 않을 수 있음
+//    CELLAR SPARQL이 더 안정적이지만, 간단히 HTML 파싱 대신 검색 URL 기반으로 처리
 async function fetchEURLex(keyword) {
   try {
-    const res = await fetch(
-      `https://eur-lex.europa.eu/search.html?scope=EURLEX&text=${encodeURIComponent(keyword)}&lang=en&format=json`
-    )
-    if (!res.ok) return []
+    // EUR-Lex SRU 검색 API 사용
+    const url = `https://eur-lex.europa.eu/EURLexWebService?wt=json&query=${encodeURIComponent(keyword)}&page=1&pageSize=5`
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    })
+
+    if (!res.ok) {
+      // 폴백: 기본 검색으로 대체
+      console.warn(`EUR-Lex API 응답 ${res.status} — 폴백 사용`)
+      return []
+    }
+
     const data = await res.json()
-    return (data.results || []).slice(0, 5).map(r => ({
-      title: r.title,
-      summary: r.summary?.slice(0, 300),
-      source_url: r.uri,
-      published_at: r.date,
+    const results = data?.results || data?.cellarDocuments || []
+
+    if (!Array.isArray(results) || !results.length) return []
+
+    return results.slice(0, 5).map(r => ({
+      title: r.title || r.name || `${keyword} — EU Legislation`,
+      summary: (r.summary || r.description || '').slice(0, 300) || null,
+      source_url: r.uri || r.url || `https://eur-lex.europa.eu/search.html?query=${encodeURIComponent(keyword)}`,
+      published_at: r.date || r.dateDocument || new Date().toISOString(),
       country: 'EU'
     }))
   } catch (e) {
@@ -74,48 +110,80 @@ async function getTrend(keyword) {
   return data?.[0]
 }
 
+// ★ 중복 방지: upsert + ignoreDuplicates
 async function saveEvidence(trendId, items) {
-  if (!items.length) return
+  if (!items.length) return 0
+
   const sourceMap = { KR: '국회 의안정보시스템', US: 'Congress.gov', EU: 'EUR-Lex' }
-  const regionMap = { KR: 'Asia', US: 'Americas', EU: 'Europe' }
-  const rows = items.map(item => ({
-    trend_id: trendId,
-    type: 'law',
-    title: item.title,
-    summary: item.summary,
-    source_url: item.source_url,
-    source_name: sourceMap[item.country] || item.country,
-    country: item.country,
-    region: regionMap[item.country] || 'Global',
-    published_at: item.published_at,
-    relevance_score: 0.9
-  }))
-  const { error } = await supabase.from('evidence').insert(rows)
-  if (error) console.error('law evidence error:', error)
+
+  const rows = items
+    .filter(item => item.source_url)
+    .map(item => ({
+      trend_id: trendId,
+      type: 'law',
+      title: item.title,
+      summary: item.summary,
+      source_url: item.source_url,
+      source_name: sourceMap[item.country] || item.country,
+      country: item.country,
+      region: regionOf(item.country),
+      published_at: item.published_at || new Date().toISOString(),
+      relevance_score: 0.9
+    }))
+
+  if (!rows.length) return 0
+
+  const { data, error } = await supabase
+    .from('evidence')
+    .upsert(rows, {
+      onConflict: 'trend_id,source_url',
+      ignoreDuplicates: true
+    })
+    .select('id')
+
+  if (error) {
+    console.error('law evidence error:', error.message)
+    return 0
+  }
+  return data?.length || 0
 }
 
 export default async function handler(req, res) {
   if (req.headers['x-cron-secret'] !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
+
+  const results = []
+
   try {
+    // 한국 법안 수집
     for (const keyword of KR_KEYWORDS) {
       const trend = await getTrend(keyword)
       if (!trend) continue
       const laws = await fetchKoreanLaws(keyword)
-      await saveEvidence(trend.id, laws)
+      const saved = await saveEvidence(trend.id, laws)
+      results.push({ keyword, country: 'KR', saved })
       await new Promise(r => setTimeout(r, 800))
     }
+
+    // 미국 + EU 법안 수집
     for (const keyword of US_KEYWORDS) {
       const trend = await getTrend(keyword)
       if (!trend) continue
       const [us, eu] = await Promise.all([fetchUSLaws(keyword), fetchEURLex(keyword)])
-      await saveEvidence(trend.id, us)
-      await saveEvidence(trend.id, eu)
+      const sUS = await saveEvidence(trend.id, us)
+      const sEU = await saveEvidence(trend.id, eu)
+      results.push({ keyword, US: sUS, EU: sEU })
       await new Promise(r => setTimeout(r, 800))
     }
-    res.status(200).json({ ok: true, message: '법안 수집 완료 (KR+US+EU)' })
+
+    res.status(200).json({
+      ok: true,
+      message: '법안 수집 완료 (KR+US+EU)',
+      details: results
+    })
   } catch (e) {
+    console.error('laws handler error:', e)
     res.status(500).json({ error: e.message })
   }
 }

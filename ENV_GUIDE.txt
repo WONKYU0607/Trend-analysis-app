@@ -1,17 +1,46 @@
-# Vercel 환경변수 설정 가이드
-# Vercel 대시보드 → 프로젝트 → Settings → Environment Variables 에서 입력
+# ============================================
+# ATLAS 환경변수 설정 가이드
+# ============================================
 
+# ──────────────────────────────────────────
+# Vercel 대시보드 → 프로젝트 → Settings → Environment Variables
+# ──────────────────────────────────────────
+
+# [필수] Supabase
 SUPABASE_URL=             # Supabase 프로젝트 URL (https://xxx.supabase.co)
-SUPABASE_SERVICE_KEY=     # Supabase service_role 키 (Settings → API)
-ANTHROPIC_API_KEY=        # Claude API 키 (console.anthropic.com)
-CRON_SECRET=              # 아무 랜덤 문자열 (예: techtrend-secret-2024)
+SUPABASE_SERVICE_KEY=     # Supabase service_role 키 (Settings → API → service_role)
 
-# 아래는 공공데이터포털 / 각 기관에서 발급
+# [필수] 보안
+CRON_SECRET=              # 아무 랜덤 문자열 (예: atlas-cron-2024-xyz)
+
+# [필수] AI 분석
+ANTHROPIC_API_KEY=        # Claude API 키 (console.anthropic.com)
+                          # ※ 사용 모델: claude-sonnet-4-5-20241022
+
+# [선택] 한국 특허 — 미설정 시 KIPRIS 수집 건너뜀
 KIPRIS_KEY=               # https://plus.kipris.or.kr → API 신청
+
+# [선택] 한국 국회 법안 — 미설정 시 국회 법안 수집 건너뜀
 ASSEMBLY_KEY=             # https://open.assembly.go.kr → 인증키 신청
+
+# [선택] 미국 법안 — 미설정 시 Congress 수집 건너뜀
 CONGRESS_KEY=             # https://api.congress.gov → 무료 신청
+
+# [선택] 유럽 특허 — 미설정 시 EPO 수집 건너뜀
 EPO_TOKEN=                # https://ops.epo.org → 무료 계정 생성 후 발급
 
-# GitHub Actions Secrets 에도 동일하게 입력
-# 추가로 아래 항목도 GitHub Secrets 에 필요
-VERCEL_URL=               # https://your-project.vercel.app
+# ──────────────────────────────────────────
+# GitHub Actions Secrets (레포 → Settings → Secrets)
+# ──────────────────────────────────────────
+# 위의 모든 키 + 아래 추가 항목:
+
+VERCEL_URL=               # https://trend-analysis-app.vercel.app
+                          # ※ https:// 포함하여 입력
+
+# ──────────────────────────────────────────
+# 참고: API 키 없이도 동작하는 수집기
+# ──────────────────────────────────────────
+# - arXiv: 키 불필요 (공개 API)
+# - OpenAlex: 키 불필요 (공개 API)
+# - USPTO PatentsView: 키 불필요 (공개 API)
+# → 최소한 SUPABASE + CRON_SECRET + ANTHROPIC만 있으면 기본 동작 가능
