@@ -128,46 +128,95 @@ function getConfidence(score) {
   return 'low'
 }
 
+// ============================================
+// ★ 2단계: 카테고리별 핵심 요약 리포트 생성
+// ============================================
+const EMPTY_REPORT = {
+  headline: '',
+  summary: '',
+  news_highlights: [],
+  paper_highlights: [],
+  law_highlights: [],
+  patent_highlights: [],
+  related_companies: [],
+  prediction: '',
+  sector: '',
+  time_horizon: '중기(3년)',
+  key_signals: [],
+  risk_factors: [],
+  countries_leading: [],
+  investment_tip: ''
+}
+
 async function generateReport(keyword, evidenceList, score) {
-  // ★ API 키 체크
   if (!process.env.GEMINI_API_KEY) {
     console.warn('GEMINI_API_KEY 미설정 — AI 분석 건너뜀')
-    return {
-      summary: '분석 대기 중 (API 키 미설정)',
-      prediction: '',
-      sector: '',
-      time_horizon: '중기(3년)',
-      key_signals: [],
-      risk_factors: [],
-      countries_leading: []
-    }
+    return { ...EMPTY_REPORT, summary: '분석 대기 중 (API 키 미설정)' }
   }
 
+  // 타입별로 정리 (각 카테고리 최대 8건씩)
   const byType = {}
   for (const e of evidenceList) {
     if (!byType[e.type]) byType[e.type] = []
-    byType[e.type].push(`[${e.country || 'global'}] ${e.title}${e.summary ? ' — ' + e.summary : ''}`)
+    if (byType[e.type].length < 8) {
+      byType[e.type].push(`[${e.country || 'global'}] ${e.title}${e.summary ? ' — ' + e.summary.slice(0, 200) : ''}`)
+    }
   }
 
   const dataBlock = Object.entries(byType).map(([type, items]) =>
-    `[${type.toUpperCase()}]\n${items.slice(0, 5).join('\n')}`
+    `[${type.toUpperCase()}]\n${items.join('\n')}`
   ).join('\n\n')
 
+  // 각 카테고리에 데이터가 있는지 확인
+  const hasNews = (byType.news?.length || 0) > 0
+  const hasPaper = (byType.paper?.length || 0) > 0
+  const hasLaw = (byType.law?.length || 0) > 0 || (byType.policy?.length || 0) > 0
+  const hasPatent = (byType.patent?.length || 0) > 0
+
   const prompt = `당신은 글로벌 기술 트렌드 전문 분석가입니다.
-아래 데이터를 종합해서 "${keyword}" 기술의 투자 전망을 분석해주세요.
+아래 수집 데이터를 종합해서 "${keyword}" 기술의 **원페이지 대시보드용 분석 리포트**를 작성하세요.
 트렌드 점수: ${score}/100
+일반인도 쉽게 이해할 수 있는 한국어로, 구체적이고 간결하게 작성하세요.
+related_companies에는 이 기술을 영위하거나 진출하려는 주요 기업 5~8개를 포함하세요.
+한국 상장사(코스피/코스닥)를 우선 포함하고, 글로벌 빅테크와 유망 스타트업도 섞어주세요.
 
 ${dataBlock}
 
 반드시 아래 JSON 형식으로만 응답하세요 (마크다운 코드블록 없이 순수 JSON):
 {
-  "summary": "2~3문장 핵심 요약 (한국어)",
-  "prediction": "향후 1~3년 전망 및 투자 포인트 (한국어, 3~5문장)",
+  "headline": "${keyword} 기술 현황을 한 문장으로 (예: '글로벌 투자 급증, 한국은 규제 정비 단계')",
+  "summary": "이번 주 핵심 동향 3줄 요약 (각 줄을 \\n으로 구분, 뉴스·논문·정책을 종합)",
+  ${hasNews ? `"news_highlights": [
+    {"title": "뉴스 핵심 1번 제목 (15자 이내)", "insight": "왜 중요한지 1줄 설명"},
+    {"title": "뉴스 핵심 2번 제목", "insight": "왜 중요한지 1줄 설명"},
+    {"title": "뉴스 핵심 3번 제목", "insight": "왜 중요한지 1줄 설명"}
+  ],` : `"news_highlights": [],`}
+  ${hasPaper ? `"paper_highlights": [
+    {"title": "논문/연구 핵심 1번 (15자 이내)", "insight": "연구 의미 1줄 설명"},
+    {"title": "논문/연구 핵심 2번", "insight": "연구 의미 1줄 설명"},
+    {"title": "논문/연구 핵심 3번", "insight": "연구 의미 1줄 설명"}
+  ],` : `"paper_highlights": [],`}
+  ${hasLaw ? `"law_highlights": [
+    {"title": "정책/법안 핵심 1번 (15자 이내)", "insight": "영향 1줄 설명", "country": "KR 또는 US 등"},
+    {"title": "정책/법안 핵심 2번", "insight": "영향 1줄 설명", "country": "국가코드"},
+    {"title": "정책/법안 핵심 3번", "insight": "영향 1줄 설명", "country": "국가코드"}
+  ],` : `"law_highlights": [],`}
+  ${hasPatent ? `"patent_highlights": [
+    {"title": "특허 동향 핵심 1번 (15자 이내)", "insight": "의미 1줄 설명", "company": "출원 기업/기관"},
+    {"title": "특허 동향 핵심 2번", "insight": "의미 1줄 설명", "company": "기업/기관"},
+    {"title": "특허 동향 핵심 3번", "insight": "의미 1줄 설명", "company": "기업/기관"}
+  ],` : `"patent_highlights": [],`}
+  "prediction": "향후 1~3년 전망 (3~5문장, 구체적 수치나 시점 포함)",
   "sector": "관련 산업 분야",
   "time_horizon": "단기(1년) 또는 중기(3년) 또는 장기(5년+)",
   "key_signals": ["핵심 신호1", "핵심 신호2", "핵심 신호3"],
-  "risk_factors": ["리스크1", "리스크2"],
-  "countries_leading": ["주도국가1", "주도국가2"]
+  "risk_factors": ["리스크1 (구체적으로)", "리스크2"],
+  "countries_leading": ["주도국가1", "주도국가2"],
+  "related_companies": [
+    {"name": "기업명", "ticker": "종목코드 (상장사만, 없으면 빈 문자열)", "type": "대기업/중견기업/스타트업", "role": "이 기술에서 어떤 역할을 하는지 1줄", "country": "KR/US/등"},
+    {"name": "기업명2", "ticker": "", "type": "스타트업", "role": "역할 1줄", "country": "KR"}
+  ],
+  "investment_tip": "투자자/사업자를 위한 핵심 조언 1~2문장"
 }`
 
   try {
@@ -180,7 +229,7 @@ ${dataBlock}
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 1000
+            maxOutputTokens: 2500  // ★ 기업 정보 포함 확장 구조
           }
         })
       }
@@ -194,21 +243,14 @@ ${dataBlock}
 
     const data = await res.json()
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-
-    // JSON 파싱 (코드블록 감싸기 대응)
     const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
-    return JSON.parse(cleaned)
+    const parsed = JSON.parse(cleaned)
+
+    // ★ 누락된 필드 기본값으로 보완
+    return { ...EMPTY_REPORT, ...parsed }
   } catch (e) {
     console.error('AI report error:', e.message)
-    return {
-      summary: `"${keyword}" 분석 중 오류 발생`,
-      prediction: '',
-      sector: '',
-      time_horizon: '중기(3년)',
-      key_signals: [],
-      risk_factors: [],
-      countries_leading: []
-    }
+    return { ...EMPTY_REPORT, summary: `"${keyword}" 분석 중 오류 발생` }
   }
 }
 

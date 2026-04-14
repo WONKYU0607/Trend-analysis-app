@@ -380,9 +380,121 @@ main { padding-top:60px; min-height:100vh; position:relative; z-index:1; }
 }
 .toast.show { transform:translateX(-50%) translateY(0); }
 
+/* ★ 3단계: 원페이지 대시보드 */
+.dash-header {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:20px; margin-bottom:28px;
+}
+.dash-headline {
+  font-size:15px; color:var(--teal); font-weight:400;
+  background:rgba(45,212,191,0.08); border:1px solid rgba(45,212,191,0.15);
+  border-radius:10px; padding:12px 18px; line-height:1.6; margin-bottom:24px;
+}
+.dash-summary {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:16px; padding:24px; margin-bottom:20px;
+}
+.dash-summary .rb-title { margin-bottom:12px; }
+.dash-summary-lines { font-size:14px; color:var(--text); line-height:2; font-weight:300; }
+
+/* 2×2 그리드 */
+.dash-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px;
+}
+.dash-card {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:16px; padding:20px; min-height:180px;
+}
+.dash-card-title {
+  font-family:var(--mono); font-size:10px; letter-spacing:0.15em;
+  color:var(--accent); text-transform:uppercase;
+  margin-bottom:14px; display:flex; align-items:center; gap:8px;
+}
+.dash-card-title .emoji { font-size:14px; }
+.dash-card-title::after { content:''; flex:1; height:1px; background:var(--border); }
+.dash-item {
+  padding:10px 0; border-bottom:1px solid var(--border);
+}
+.dash-item:last-child { border-bottom:none; }
+.dash-item-title {
+  font-size:13px; color:var(--text); font-weight:500; line-height:1.4;
+  margin-bottom:4px;
+}
+.dash-item-insight {
+  font-size:12px; color:var(--text2); font-weight:300; line-height:1.5;
+}
+.dash-item-meta {
+  font-size:10px; color:var(--text3); font-family:var(--mono); margin-top:3px;
+}
+.dash-empty {
+  color:var(--text3); font-size:12px; font-weight:300;
+  padding:20px 0; text-align:center;
+}
+
+/* 하단 풀폭 블록들 */
+.dash-full {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:16px; padding:20px 24px; margin-bottom:14px;
+}
+.dash-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;
+}
+.dash-chip-list { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.dash-chip {
+  font-size:12px; padding:5px 12px; border-radius:8px;
+  background:var(--surface); color:var(--text2); font-weight:400;
+}
+.dash-chip.risk { background:rgba(248,113,113,0.1); color:var(--coral); }
+.dash-chip.country { background:rgba(45,212,191,0.08); color:var(--teal); }
+.dash-invest {
+  font-size:14px; color:var(--amber); line-height:1.7; font-weight:400;
+  padding:16px 20px; background:rgba(251,191,36,0.06);
+  border:1px solid rgba(251,191,36,0.12); border-radius:12px;
+  margin-bottom:20px;
+}
+
+/* 더보기 토글 */
+.ev-toggle {
+  background:none; border:1px solid var(--border); border-radius:10px;
+  color:var(--text2); font-family:var(--sans); font-size:13px;
+  padding:10px 20px; cursor:pointer; width:100%; margin-bottom:14px;
+  transition:all 0.2s;
+}
+.ev-toggle:hover { border-color:var(--accent); color:var(--accent2); }
+.ev-hidden { display:none; }
+
+/* ★ 4단계: 관련 기업 */
+.company-grid {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px;
+  margin-top:12px;
+}
+.company-chip {
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:12px; padding:12px 14px; transition:border-color 0.2s;
+}
+.company-chip:hover { border-color:var(--border2); }
+.company-name {
+  font-size:14px; font-weight:500; color:var(--text); margin-bottom:2px;
+  display:flex; align-items:center; gap:6px;
+}
+.company-ticker {
+  font-family:var(--mono); font-size:10px; color:var(--accent2);
+  background:rgba(124,106,255,0.1); padding:1px 5px; border-radius:3px;
+}
+.company-type {
+  font-size:10px; color:var(--text3); font-family:var(--mono);
+  margin-bottom:4px;
+}
+.company-role {
+  font-size:11px; color:var(--text2); line-height:1.5; font-weight:300;
+}
+
 @media(max-width:640px){
   .grid { grid-template-columns:1fr; }
   .stats-row { display:none; }
+  .dash-grid { grid-template-columns:1fr; }
+  .dash-row { grid-template-columns:1fr; }
+  .dash-header { flex-direction:column; }
 }
 </style>
 </head>
@@ -536,7 +648,18 @@ function mkCard(t, clickFn) {
   </div>`
 }
 
-/* ── 상세 ── */
+/* ── 상세: 원페이지 대시보드 ── */
+function mkHighlights(items, emptyMsg) {
+  if (!items || !items.length) return `<div class="dash-empty">${emptyMsg || '데이터 수집 중'}</div>`
+  return items.map(h => `
+    <div class="dash-item">
+      <div class="dash-item-title">${esc(h.title)}</div>
+      <div class="dash-item-insight">${esc(h.insight)}</div>
+      ${h.country ? `<div class="dash-item-meta">${flags[h.country] || '🌐'} ${esc(h.country)}</div>` : ''}
+      ${h.company ? `<div class="dash-item-meta">${esc(h.company)}</div>` : ''}
+    </div>`).join('')
+}
+
 async function openDetail(id) {
   gotoPage('detail', null)
   document.getElementById('detailBody').innerHTML =
@@ -550,56 +673,125 @@ async function openDetail(id) {
     const col = s>=70?'var(--green)':s>=40?'var(--amber)':'var(--text2)'
     const R=32, C=2*Math.PI*R, dash=(s/100)*C
     const rep = report?.evidence_summary||{}
-    const signals = rep.key_signals||[]
-    const risks = rep.risk_factors||[]
-    const countries = rep.countries_leading||[]
+
+    // 2단계 확장 필드
+    const headline = rep.headline || ''
+    const summaryLines = (rep.summary || report?.summary || '분석 데이터를 로딩 중입니다.')
+    const newsH = rep.news_highlights || []
+    const paperH = rep.paper_highlights || []
+    const lawH = rep.law_highlights || []
+    const patentH = rep.patent_highlights || []
+    const signals = rep.key_signals || []
+    const risks = rep.risk_factors || []
+    const countries = rep.countries_leading || []
+    const investTip = rep.investment_tip || ''
+    const companies = rep.related_companies || []
+    const prediction = report?.prediction || rep.prediction || ''
+
     const allEv = Object.values(evidence||{}).flat()
     const cnt = tp=>(evidence?.[tp]||[]).length
     const types=[{k:'paper',l:'논문'},{k:'patent',l:'특허'},{k:'law',l:'법안'},{k:'policy',l:'정책'},{k:'news',l:'뉴스'}]
 
     document.getElementById('detailBody').innerHTML = `
-    <div class="detail-kw">${esc(trend.keyword)}</div>
-    <div class="detail-tags">
-      ${report?.sector?`<span class="tag t-sector">${esc(report.sector)}</span>`:''}
-      ${report?.time_horizon?`<span class="tag t-time">${esc(report.time_horizon)}</span>`:''}
-      ${confTag(trend.confidence_level)}
-      ${countries.map(c=>`<span class="tag" style="background:rgba(45,212,191,0.08);color:var(--teal)">${esc(c)}</span>`).join('')}
-    </div>
-
-    <div class="score-row">
-      <div class="ring-wrap">
-        <svg width="70" height="70" viewBox="0 0 70 70">
-          <circle cx="35" cy="35" r="${R}" fill="none" stroke="var(--surface)" stroke-width="5.5"/>
-          <circle cx="35" cy="35" r="${R}" fill="none" stroke="${col}" stroke-width="5.5"
-            stroke-dasharray="${dash} ${C}" stroke-linecap="round"/>
-        </svg>
-        <div class="ring-num" style="color:${col}">${s}</div>
+    <!-- 헤더: 키워드 + 점수 -->
+    <div class="dash-header">
+      <div>
+        <div class="detail-kw">${esc(trend.keyword)}</div>
+        <div class="detail-tags">
+          ${report?.sector?`<span class="tag t-sector">${esc(report.sector)}</span>`:''}
+          ${report?.time_horizon?`<span class="tag t-time">${esc(report.time_horizon)}</span>`:''}
+          ${confTag(trend.confidence_level)}
+        </div>
       </div>
-      <div class="score-desc">
-        <h3>트렌드 점수 ${s}/100 ${changeBadge(trend.weekly_change)}</h3>
-        <p>${esc(report?.summary||'분석 데이터를 로딩 중입니다.')}</p>
+      <div class="score-pill" style="padding:14px 18px;">
+        <span class="num ${sc(s)}" style="font-size:24px;">${s}</span>
+        <div class="lbl">SCORE</div>
+        ${changeBadge(trend.weekly_change)}
       </div>
     </div>
 
-    ${report?.prediction?`
-    <div class="report-block">
-      <div class="rb-title">AI 예측 분석</div>
-      <div class="rb-text">${esc(report.prediction)}</div>
-    </div>`:''}
+    <!-- 한줄 헤드라인 -->
+    ${headline ? `<div class="dash-headline">${esc(headline)}</div>` : ''}
 
-    ${signals.length?`
-    <div class="report-block">
-      <div class="rb-title">핵심 신호</div>
+    <!-- 이번 주 핵심 동향 3줄 요약 -->
+    <div class="dash-summary">
+      <div class="rb-title"><span class="emoji">📊</span> 이번 주 핵심 동향</div>
+      <div class="dash-summary-lines">${esc(summaryLines).replace(/\\n/g, '<br>')}</div>
+    </div>
+
+    <!-- 2×2 카테고리 그리드 -->
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="dash-card-title"><span class="emoji">📰</span> 뉴스·기사</div>
+        ${mkHighlights(newsH, '수집된 뉴스 없음')}
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-title"><span class="emoji">📄</span> 논문·연구</div>
+        ${mkHighlights(paperH, '수집된 논문 없음')}
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-title"><span class="emoji">⚖️</span> 정책·법안</div>
+        ${mkHighlights(lawH, '수집된 법안 없음')}
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-title"><span class="emoji">📋</span> 특허 동향</div>
+        ${mkHighlights(patentH, '수집된 특허 없음')}
+      </div>
+    </div>
+
+    <!-- ★ 4단계: 관련 기업 -->
+    ${companies.length ? `
+    <div class="dash-full">
+      <div class="rb-title"><span class="emoji">🏢</span> 관련 기업</div>
+      <div class="company-grid">
+        ${companies.map(c => `
+          <div class="company-chip">
+            <div class="company-name">
+              ${esc(c.name)}
+              ${c.ticker ? `<span class="company-ticker">${esc(c.ticker)}</span>` : ''}
+            </div>
+            <div class="company-type">${flags[c.country]||'🌐'} ${esc(c.type || '')}</div>
+            <div class="company-role">${esc(c.role || '')}</div>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- 투자 조언 -->
+    ${investTip ? `<div class="dash-invest">💡 ${esc(investTip)}</div>` : ''}
+
+    <!-- AI 예측 + 리스크/주도국가 -->
+    ${prediction ? `
+    <div class="dash-full">
+      <div class="rb-title"><span class="emoji">🔮</span> AI 전망 분석</div>
+      <div class="rb-text">${esc(prediction)}</div>
+    </div>` : ''}
+
+    <div class="dash-row">
+      <div class="dash-full" style="margin-bottom:0;">
+        <div class="rb-title"><span class="emoji">⚠️</span> 리스크 요인</div>
+        <div class="dash-chip-list">
+          ${risks.length ? risks.map(r=>`<span class="dash-chip risk">${esc(r)}</span>`).join('') : '<span class="dash-empty">분석 중</span>'}
+        </div>
+      </div>
+      <div class="dash-full" style="margin-bottom:0;">
+        <div class="rb-title"><span class="emoji">🌍</span> 주도 국가</div>
+        <div class="dash-chip-list">
+          ${countries.length ? countries.map(c=>`<span class="dash-chip country">${esc(c)}</span>`).join('') : '<span class="dash-empty">분석 중</span>'}
+        </div>
+      </div>
+    </div>
+
+    ${signals.length ? `
+    <div class="dash-full">
+      <div class="rb-title"><span class="emoji">📡</span> 핵심 신호</div>
       <ul class="sig-list">${signals.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
-    </div>`:''}
+    </div>` : ''}
 
-    ${risks.length?`
-    <div class="report-block">
-      <div class="rb-title">리스크 요인</div>
-      <ul class="sig-list">${risks.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
-    </div>`:''}
-
-    <div class="ev-section">
+    <!-- 근거 자료 (더보기) -->
+    <button class="ev-toggle" onclick="this.nextElementSibling.classList.toggle('ev-hidden');this.textContent=this.textContent.includes('펼치기')?'근거 자료 접기 ▲':'근거 자료 펼치기 (${allEv.length}건) ▼'">
+      근거 자료 펼치기 (${allEv.length}건) ▼
+    </button>
+    <div class="ev-section ev-hidden">
       <div class="ev-tabs" id="evTabs">
         <button class="ev-tab active" onclick="switchEv('all',this)">전체 <span class="cnt">${allEv.length}</span></button>
         ${types.filter(t=>cnt(t.k)>0).map(t=>`<button class="ev-tab" onclick="switchEv('${t.k}',this)">${t.l} <span class="cnt">${cnt(t.k)}</span></button>`).join('')}
