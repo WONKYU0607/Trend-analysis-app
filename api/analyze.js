@@ -8,8 +8,102 @@ const supabase = createClient(
 // 타입별 가중치 (법안/정책이 가장 강한 신호)
 const WEIGHTS = { law: 0.30, patent: 0.25, paper: 0.25, policy: 0.10, news: 0.10 }
 
-// ★ 한 번에 분석할 최대 트렌드 수 (Vercel 60초 제한 대비)
-const BATCH_SIZE = 5
+// ★ 필터링 API 호출 추가로 BATCH_SIZE 축소 (Vercel 60초 제한)
+const BATCH_SIZE = 3
+
+// ============================================
+// ★ 1단계 핵심: AI 관련성 필터링
+// ============================================
+async function filterByRelevance(keyword, evidenceList) {
+  if (!process.env.GEMINI_API_KEY || !evidenceList.length) {
+    return evidenceList // API 키 없으면 필터링 건너뜀
+  }
+
+  // evidence 목록을 번호 매긴 리스트로 변환
+  const itemList = evidenceList.map((e, i) => {
+    const title = (e.title || '').slice(0, 120)
+    const summary = (e.summary || '').slice(0, 150)
+    return `${i + 1}. [${e.type}] ${title}${summary ? ' — ' + summary : ''}`
+  }).join('\n')
+
+  const prompt = `당신은 기술 트렌드 데이터 품질 관리 전문가입니다.
+아래는 "${keyword}" 키워드로 수집된 근거 자료 목록입니다.
+각 항목이 "${keyword}" 기술/산업과 **직접적으로 관련이 있는지** 판단해주세요.
+
+판단 기준:
+- ✅ 관련 있음: 해당 기술의 개발, 응용, 시장, 투자, 규제, 정책을 직접 다루는 자료
+- ❌ 관련 없음: 키워드가 우연히 포함된 것, 다른 분야의 자료, 너무 일반적인 내용
+
+${itemList}
+
+반드시 아래 JSON 형식으로만 응답하세요 (마크다운 코드블록 없이 순수 JSON):
+{"relevant": [관련 있는 항목 번호들], "irrelevant": [관련 없는 항목 번호들]}
+
+예시: {"relevant": [1, 3, 5, 7], "irrelevant": [2, 4, 6]}`
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 500 }
+        })
+      }
+    )
+
+    if (!res.ok) {
+      console.error(`필터링 Gemini HTTP ${res.status}`)
+      return evidenceList // 실패 시 전체 유지
+    }
+
+    const data = await res.json()
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+    const result = JSON.parse(cleaned)
+
+    const relevantSet = new Set((result.relevant || []).map(n => n - 1)) // 0-indexed
+    const irrelevantSet = new Set((result.irrelevant || []).map(n => n - 1))
+
+    // ★ DB에 관련성 점수 업데이트
+    const updatePromises = []
+    for (let i = 0; i < evidenceList.length; i++) {
+      const e = evidenceList[i]
+      if (irrelevantSet.has(i)) {
+        // 관련 없는 것: relevance_score를 0으로
+        updatePromises.push(
+          supabase.from('evidence').update({ relevance_score: 0 }).eq('id', e.id)
+        )
+      } else if (relevantSet.has(i)) {
+        // 관련 있는 것: relevance_score를 높게 유지/업데이트
+        const newScore = Math.max(e.relevance_score || 0, 0.8)
+        updatePromises.push(
+          supabase.from('evidence').update({ relevance_score: newScore }).eq('id', e.id)
+        )
+      }
+    }
+    await Promise.all(updatePromises)
+
+    // 관련 있는 것만 반환
+    const filtered = evidenceList.filter((_, i) => relevantSet.has(i))
+
+    const removedCount = evidenceList.length - filtered.length
+    console.log(`[${keyword}] 필터링: ${evidenceList.length}건 → ${filtered.length}건 (${removedCount}건 제거)`)
+
+    // 필터링 후 아무것도 안 남으면 최소 상위 5개는 유지
+    if (filtered.length === 0 && evidenceList.length > 0) {
+      console.warn(`[${keyword}] 필터링 결과 0건 — 상위 5건 유지`)
+      return evidenceList.slice(0, 5)
+    }
+
+    return filtered
+  } catch (e) {
+    console.error(`[${keyword}] 필터링 오류:`, e.message)
+    return evidenceList // 오류 시 전체 유지
+  }
+}
 
 function calcTrendScore(evidenceList) {
   const count = { paper: 0, patent: 0, law: 0, policy: 0, news: 0 }
@@ -148,10 +242,14 @@ export default async function handler(req, res) {
 
       if (!evidenceList?.length) continue
 
-      const newScore = calcTrendScore(evidenceList)
+      // ★ 1단계: AI 관련성 필터링 (쓰레기 데이터 제거)
+      const filteredEvidence = await filterByRelevance(trend.keyword, evidenceList)
+
+      // ★ 필터링된 데이터로 점수 계산
+      const newScore = calcTrendScore(filteredEvidence)
       const confidence = getConfidence(newScore)
 
-      // ★ weekly_change 계산: 이전 점수와 비교
+      // weekly_change 계산: 이전 점수와 비교
       const prevScore = trend.score || 0
       const weeklyChange = newScore - prevScore
 
@@ -163,7 +261,8 @@ export default async function handler(req, res) {
         updated_at: new Date().toISOString()
       }).eq('id', trend.id)
 
-      const report = await generateReport(trend.keyword, evidenceList, newScore)
+      // ★ 필터링된 데이터로 리포트 생성
+      const report = await generateReport(trend.keyword, filteredEvidence, newScore)
 
       await supabase.from('reports').upsert({
         trend_id: trend.id,
@@ -179,7 +278,8 @@ export default async function handler(req, res) {
         keyword: trend.keyword,
         score: newScore,
         change: weeklyChange,
-        confidence
+        confidence,
+        filtered: `${filteredEvidence.length}/${evidenceList.length}`  // ★ 필터링 결과 표시
       })
 
       analyzed++
@@ -188,7 +288,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       ok: true,
-      message: `${analyzed}/${trends.length}개 트렌드 분석 완료 (배치 ${BATCH_SIZE})`,
+      message: `${analyzed}/${trends.length}개 트렌드 분석 완료 (배치 ${BATCH_SIZE}, 관련성 필터링 적용)`,
       details: results
     })
   } catch (e) {
