@@ -322,9 +322,9 @@ main { padding-top:52px; min-height:100vh; }
 <header>
   <div class="logo"><span>ATLAS</span> RESEARCH</div>
   <nav>
-    <button class="active" onclick="gotoPage('home',this)">리서치</button>
-    <button onclick="gotoPage('search',this)">탐색</button>
-    <button onclick="gotoPage('alerts',this)">알림</button>
+    <button class="active" data-page="home" onclick="gotoPage('home',this)">리서치</button>
+    <button data-page="search" onclick="gotoPage('search',this)">탐색</button>
+    <button data-page="alerts" onclick="gotoPage('alerts',this)">알림</button>
   </nav>
 </header>
 
@@ -351,7 +351,7 @@ main { padding-top:52px; min-height:100vh; }
 <!-- 상세 -->
 <div id="page-detail" class="page">
   <div class="report-wrap">
-    <button class="back-link" onclick="gotoPage('home',document.querySelector('nav button'))">← 목록</button>
+    <button class="back-link" onclick="gotoHome()">← 목록</button>
     <div id="detailBody"></div>
   </div>
 </div>
@@ -400,6 +400,21 @@ function gotoPage(name, btn) {
   if(btn) btn.classList.add('active')
   if(name==='alerts') renderAlerts()
   window.scrollTo(0,0)
+}
+function gotoHome() {
+  const homeBtn = document.querySelector('nav button[data-page="home"]')
+  gotoPage('home', homeBtn)
+}
+function openEv(el) {
+  const url = el.dataset.url
+  if (url) window.open(url, '_blank', 'noopener,noreferrer')
+}
+function pickTag(el) {
+  const kw = el.dataset.kw || ''
+  const inp = document.getElementById('searchInput')
+  inp.value = kw
+  gotoPage('search', document.querySelector('nav button[data-page="search"]'))
+  doSearch(kw)
 }
 function sc(s){ return s>=70?'sc-hi':s>=40?'sc-mid':'sc-lo' }
 function changeBadge(v) {
@@ -591,25 +606,31 @@ async function openDetail(id) {
     </div>` : ''}`
 
     window._ev = evidence
-  } catch(e){ toast('데이터를 불러오지 못했습니다') }
+  } catch(e){
+    document.getElementById('detailBody').innerHTML =
+      `<div class="empty">데이터를 불러오지 못했습니다<br><br>
+       <button class="back-link" onclick="gotoHome()" style="margin:0 auto">← 목록으로</button></div>`
+    toast('데이터를 불러오지 못했습니다')
+  }
 }
 
 function toggleEv(btn) {
   const sec = document.getElementById('evSection')
-  const open = !sec.classList.contains('ev-collapsed')
+  const isCollapsed = sec.classList.contains('ev-collapsed')
   sec.classList.toggle('ev-collapsed')
-  btn.textContent = open
-    ? `근거 자료 보기 (${Object.values(window._ev||{}).flat().length}건) ▼`
-    : `근거 자료 접기 ▲`
+  const total = Object.values(window._ev||{}).flat().length
+  btn.textContent = isCollapsed
+    ? `근거 자료 접기 ▲`
+    : `근거 자료 보기 (${total}건) ▼`
 }
 
 function mkEvList(items) {
   if(!items.length) return `<div class="empty">근거 자료 없음</div>`
-  return items.slice(0,20).map(e=>{
+  return items.map(e=>{
     const d = e.published_at ? new Date(e.published_at).toLocaleDateString('ko-KR') : ''
-    const url = e.source_url ? esc(e.source_url) : ''
+    const rawUrl = e.source_url || ''
     return `
-    <div class="ev-item" ${url?`onclick="window.open('${url}','_blank')"`:''}>
+    <div class="ev-item" ${rawUrl ? `data-url="${esc(rawUrl)}" onclick="openEv(this)"` : ''}>
       <div class="ev-title">${esc(e.title)}</div>
       <div class="ev-meta">
         ${e.source_name?`<span class="ev-src">${esc(e.source_name)}</span>`:''}
@@ -681,7 +702,7 @@ async function loadHome() {
     }
     grid.innerHTML = allTrends.map(t=>mkCard(t,`openDetail('${t.id}')`)).join('')
     document.getElementById('qtags').innerHTML = allTrends.slice(0,8).map(t=>
-      `<button class="qtag" onclick="document.getElementById('searchInput').value='${esc(t.keyword)}';doSearch('${esc(t.keyword)}')">${esc(t.keyword)}</button>`
+      `<button class="qtag" data-kw="${esc(t.keyword)}" onclick="pickTag(this)">${esc(t.keyword)}</button>`
     ).join('')
   } catch(e){
     document.getElementById('homeGrid').innerHTML=`<div class="empty" style="grid-column:1/-1">데이터를 불러오지 못했습니다</div>`

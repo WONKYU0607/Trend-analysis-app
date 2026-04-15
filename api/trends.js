@@ -6,87 +6,76 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  // ★ CORS: 배포 도메인만 허용 (개발 시에는 * 사용)
-  const allowedOrigin = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL.replace(/^https?:\/\//, '')}`
-    : '*'
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin)
-  res.setHeader('Cache-Control', 's-maxage=300') // 5분 캐시
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  if (req.method === 'OPTIONS') return res.status(200).end()
 
-  const { id, type, country } = req.query
+  const { id } = req.query
 
   try {
-    // ── 단일 트렌드 상세 (근거자료 포함) ──
+    // ── 상세 조회 ──────────────────────────────────────────
     if (id) {
-      const { data: trend } = await supabase
+      // trend
+      const { data: trend, error: tErr } = await supabase
         .from('trends')
         .select('*')
         .eq('id', id)
         .single()
+      if (tErr || !trend) return res.status(404).json({ error: 'not found' })
 
-      if (!trend) {
-        return res.status(404).json({ error: '트렌드를 찾을 수 없습니다' })
-      }
-
+      // report
       const { data: report } = await supabase
         .from('reports')
         .select('*')
         .eq('trend_id', id)
         .single()
 
-      let evidenceQuery = supabase
+      // evidence — 타입별로 분류
+      const { data: evRows } = await supabase
         .from('evidence')
         .select('*')
         .eq('trend_id', id)
         .order('relevance_score', { ascending: false })
+        .limit(100)
 
-      if (type) evidenceQuery = evidenceQuery.eq('type', type)
-      if (country) evidenceQuery = evidenceQuery.eq('country', country)
-
-      const { data: evidence } = await evidenceQuery.limit(50)
-
-      // 타입별 그룹핑
-      const grouped = { paper: [], patent: [], law: [], policy: [], news: [] }
-      for (const e of (evidence || [])) {
-        if (grouped[e.type]) grouped[e.type].push(e)
+      const evidence = { paper: [], patent: [], law: [], policy: [], news: [] }
+      for (const e of evRows || []) {
+        if (evidence[e.type]) evidence[e.type].push(e)
       }
 
-      return res.status(200).json({ trend, report, evidence: grouped })
+      return res.status(200).json({ trend, report: report || null, evidence })
     }
 
-    // ── 전체 트렌드 목록 (스코어 순) ──
-    const { data: trends } = await supabase
+    // ── 목록 조회 ──────────────────────────────────────────
+    const { data: trends, error: lErr } = await supabase
       .from('trends')
       .select(`
-        id, keyword, category, score, weekly_change,
+        id, keyword, category, score, prev_score, weekly_change,
         confidence_level, updated_at,
-        reports (summary, sector, time_horizon)
+        reports ( summary, sector, time_horizon )
       `)
       .order('score', { ascending: false })
-      .limit(20)
+      .limit(60)
 
-    // ★ 실제 evidence 총 개수 조회
-    const { count: evidenceCount } = await supabase
-      .from('evidence')
-      .select('*', { count: 'exact', head: true })
+    if (lErr) throw lErr
 
-    // ★ 국가별 커버리지 조회
-    const { data: countriesData } = await supabase
+    // stats
+    const { data: evCount } = await supabase.rpc('get_evidence_count')
+    const { data: countries } = await supabase
       .from('evidence')
       .select('country')
-    const uniqueCountries = [...new Set((countriesData || []).map(e => e.country).filter(Boolean))]
+    const countryCount = new Set((countries || []).map(r => r.country).filter(Boolean)).size
 
-    res.status(200).json({
+    return res.status(200).json({
       trends: trends || [],
       stats: {
         trendCount: trends?.length || 0,
-        evidenceCount: evidenceCount || 0,
-        countries: uniqueCountries,
-        countryCount: uniqueCountries.length
+        evidenceCount: Number(evCount) || 0,
+        countryCount
       }
     })
   } catch (e) {
-    console.error('trends API error:', e)
-    res.status(500).json({ error: e.message })
+    console.error('[trends] error:', e)
+    return res.status(500).json({ error: e.message || 'internal error' })
   }
 }
