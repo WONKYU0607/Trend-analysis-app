@@ -1,0 +1,43 @@
+name: AI 트렌드 분석
+
+on:
+  schedule:
+    # 매일 오전 6시 (KST = UTC+9, 즉 UTC 21:00 전날)
+    - cron: '0 21 * * *'
+  workflow_dispatch: # 수동 실행 버튼
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 트렌드 분석 실행
+        run: |
+          echo "분석 시작..."
+          # 배치 크기 3개씩, 총 20개 트렌드면 7번 반복 (여유있게 10번)
+          for i in $(seq 1 10); do
+            echo "배치 $i 실행 중..."
+            STATUS=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+              -X POST "${{ secrets.VERCEL_URL }}/api/analyze" \
+              -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+              -H "Content-Type: application/json")
+            
+            BODY=$(cat /tmp/resp.json)
+            echo "배치 $i 결과 (HTTP $STATUS): $BODY"
+            
+            # 분석할 트렌드 없으면 종료
+            if echo "$BODY" | grep -q "분析할 트렌드 없음\|분析 트렌드 없음"; then
+              echo "모든 트렌드 분석 완료"
+              break
+            fi
+            
+            # API 에러면 종료
+            if [ "$STATUS" != "200" ]; then
+              echo "API 오류 발생 (HTTP $STATUS), 중단"
+              exit 1
+            fi
+            
+            # 배치 간 대기 (Gemini rate limit 여유)
+            echo "다음 배치까지 25초 대기..."
+            sleep 25
+          done
+          echo "분석 파이프라인 완료"
