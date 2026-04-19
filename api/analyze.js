@@ -7,7 +7,9 @@ const supabase = createClient(
 
 const WEIGHTS = { law: 0.30, patent: 0.25, paper: 0.25, policy: 0.10, news: 0.10 }
 const BATCH_SIZE = 3
-const API_DELAY = 6000
+const API_DELAY = 15000    // 15초 (429 rate limit 방지)
+const RETRY_DELAY = 30000   // 429 시 재시도 대기
+const MAX_RETRY = 2
 
 const EMPTY_REPORT = {
   headline: '',
@@ -160,18 +162,37 @@ ${itemList}
   "investment_tip": "핵심 조언 1~2문장"
 }`
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 3000 }
-        })
+  // ★ 429 재시도 로직
+  async function callGemini(prompt) {
+    for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.4, maxOutputTokens: 3000 }
+          })
+        }
+      )
+      if (res.status === 429) {
+        console.warn(`Gemini 429 Rate Limit — ${attempt + 1}/${MAX_RETRY + 1}회 시도, ${RETRY_DELAY/1000}초 대기...`)
+        if (attempt < MAX_RETRY) await new Promise(r => setTimeout(r, RETRY_DELAY))
+        continue
       }
-    )
+      if (!res.ok) {
+        const errBody = await res.text()
+        console.error(`Gemini API HTTP ${res.status}:`, errBody)
+        throw new Error(`Gemini API ${res.status}`)
+      }
+      return res
+    }
+    throw new Error('Gemini API 429 — 재시도 한도 초과')
+  }
+
+  try {
+    const res = await callGemini(prompt)
 
     if (!res.ok) {
       const errBody = await res.text()
