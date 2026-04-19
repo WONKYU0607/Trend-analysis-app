@@ -187,9 +187,31 @@ ${itemList}
     try {
       parsed = JSON.parse(cleaned)
     } catch {
-      // JSON 파싱 실패 시 중괄호 사이만 추출 재시도
-      const match = cleaned.match(/\{[\s\S]*\}/)
-      parsed = match ? JSON.parse(match[0]) : {}
+      // ★ 핵심 수정: Gemini가 문자열 안에 실제 개행을 넣으면 JSON 파싱 실패
+      // 문자열 값 내부의 실제 개행을 \n 이스케이프로 교체 후 재시도
+      try {
+        const fixedNewlines = cleaned.replace(
+          /"((?:[^"\\]|\\.)*)"/g,
+          (_, val) => '"' + val.replace(/\r?\n/g, '\\n') + '"'
+        )
+        parsed = JSON.parse(fixedNewlines)
+      } catch {
+        // 그래도 실패하면 중괄호 추출 후 같은 처리
+        const match = cleaned.match(/\{[\s\S]*\}/)
+        if (match) {
+          try {
+            const fixedMatch = match[0].replace(
+              /"((?:[^"\\]|\\.)*)"/g,
+              (_, val) => '"' + val.replace(/\r?\n/g, '\\n') + '"'
+            )
+            parsed = JSON.parse(fixedMatch)
+          } catch {
+            parsed = {}
+          }
+        } else {
+          parsed = {}
+        }
+      }
     }
 
     // ★ summary 안전 추출
