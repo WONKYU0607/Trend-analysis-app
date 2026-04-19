@@ -5,15 +5,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-// 타입별 가중치 (법안/정책이 가장 강한 신호)
 const WEIGHTS = { law: 0.30, patent: 0.25, paper: 0.25, policy: 0.10, news: 0.10 }
-
 const BATCH_SIZE = 3
-
-// ★ Gemini Rate Limit 대응: 호출 간 딜레이 (ms)
 const API_DELAY = 6000
 
-// 기본 리포트 구조 (fallback용)
 const EMPTY_REPORT = {
   headline: '',
   summary: '',
@@ -32,19 +27,41 @@ const EMPTY_REPORT = {
   investment_tip: ''
 }
 
+// ★ 수정: 점수 차별화 — 타입 다양성 + 국가 다양성 + 최신성 반영
 function calcTrendScore(evidenceList) {
+  if (!evidenceList.length) return 0
+
   const count = { paper: 0, patent: 0, law: 0, policy: 0, news: 0 }
   for (const e of evidenceList) {
     if (count[e.type] !== undefined) count[e.type]++
   }
-  const countries = new Set(evidenceList.map(e => e.country).filter(Boolean))
-  const globalBonus = countries.size >= 3 ? 15 : countries.size >= 2 ? 8 : 0
 
-  let raw = 0
+  // 타입별 점수 (30건 있어도 20점 이상은 못 받게 캡 조정)
+  let typeScore = 0
   for (const [type, weight] of Object.entries(WEIGHTS)) {
-    raw += Math.min(count[type] * 5, 25) * weight
+    // 5건마다 1점, 최대 10점씩
+    typeScore += Math.min(Math.floor(count[type] / 5), 10) * weight * 10
   }
-  return Math.min(Math.round(raw * 4 + globalBonus), 100)
+
+  // 국가 다양성 보너스
+  const countries = new Set(evidenceList.map(e => e.country).filter(Boolean))
+  const globalBonus = countries.size >= 5 ? 20
+    : countries.size >= 3 ? 12
+    : countries.size >= 2 ? 6 : 0
+
+  // 타입 다양성 보너스 (법안+논문+특허 다 있으면 +15)
+  const typeCount = Object.values(count).filter(v => v > 0).length
+  const diversityBonus = typeCount >= 4 ? 15 : typeCount >= 3 ? 8 : typeCount >= 2 ? 3 : 0
+
+  // 최신성 보너스 (30일 이내 자료가 절반 이상이면 +10)
+  const now = Date.now()
+  const recentCount = evidenceList.filter(e => {
+    if (!e.published_at) return false
+    return (now - new Date(e.published_at).getTime()) < 30 * 24 * 60 * 60 * 1000
+  }).length
+  const recencyBonus = recentCount >= evidenceList.length * 0.5 ? 10 : 0
+
+  return Math.min(Math.round(typeScore + globalBonus + diversityBonus + recencyBonus), 100)
 }
 
 function getConfidence(score) {
@@ -53,11 +70,32 @@ function getConfidence(score) {
   return 'low'
 }
 
-// ============================================
-// ★ 핵심: 필터링 + 리포트를 단일 Gemini 호출로 통합
-//    기존: 트렌드당 2회 호출 → 429 Rate Limit
-//    수정: 트렌드당 1회 호출 → Rate Limit 해결
-// ============================================
+// ★ summary 필드 안전하게 추출
+function extractSummary(parsed, keyword) {
+  // Gemini가 summary를 다양한 키로 반환하는 경우 대응
+  const raw =
+    parsed.summary ||
+    parsed.핵심요약 ||
+    parsed.core_summary ||
+    parsed.overview ||
+    ''
+
+  if (raw && raw.trim().length > 10) return raw.trim()
+
+  // summary가 비었어도 highlights에서 조합
+  const highlights = [
+    ...(parsed.news_highlights   || []),
+    ...(parsed.paper_highlights  || []),
+    ...(parsed.law_highlights    || []),
+    ...(parsed.patent_highlights || [])
+  ]
+  if (highlights.length >= 2) {
+    return highlights.slice(0, 3).map(h => h.insight || h.title || '').filter(Boolean).join('\n')
+  }
+
+  return `${keyword} 관련 최신 동향을 분석 중입니다.`
+}
+
 async function filterAndReport(keyword, evidenceList, score) {
   if (!process.env.GEMINI_API_KEY) {
     console.warn('GEMINI_API_KEY 미설정 — AI 분석 건너뜀')
@@ -67,22 +105,20 @@ async function filterAndReport(keyword, evidenceList, score) {
     }
   }
 
-  // evidence → 번호 리스트
   const itemList = evidenceList.map((e, i) => {
-    const title = (e.title || '').slice(0, 120)
+    const title   = (e.title   || '').slice(0, 120)
     const summary = (e.summary || '').slice(0, 150)
     return `${i + 1}. [${e.type}][${e.country || 'global'}] ${title}${summary ? ' — ' + summary : ''}`
   }).join('\n')
 
-  // 카테고리별 데이터 존재 여부
   const byType = {}
   for (const e of evidenceList) {
     if (!byType[e.type]) byType[e.type] = []
     byType[e.type].push(e)
   }
-  const hasNews = (byType.news?.length || 0) > 0
-  const hasPaper = (byType.paper?.length || 0) > 0
-  const hasLaw = (byType.law?.length || 0) > 0 || (byType.policy?.length || 0) > 0
+  const hasNews   = (byType.news?.length   || 0) > 0
+  const hasPaper  = (byType.paper?.length  || 0) > 0
+  const hasLaw    = (byType.law?.length    || 0) > 0 || (byType.policy?.length || 0) > 0
   const hasPatent = (byType.patent?.length || 0) > 0
 
   const prompt = `당신은 글로벌 기술 트렌드 전문 분석가입니다.
@@ -91,53 +127,37 @@ async function filterAndReport(keyword, evidenceList, score) {
 
 **2가지 작업을 한 번에 수행하세요:**
 
-작업1) 관련성 필터링 — 각 항목이 "${keyword}" 기술과 직접 관련 있는지 판단
-- 관련 없음: 키워드가 우연히 포함된 것, 다른 분야, 너무 일반적인 내용
-- irrelevant_items에 관련 없는 항목 번호를 넣으세요
+작업1) 관련성 필터링
+- "${keyword}" 기술과 직접 관련 없는 항목 번호를 irrelevant_items에 넣으세요
+- 관련 없음 기준: 키워드가 우연히 포함, 다른 분야, 너무 일반적
 
-작업2) 관련 있는 자료만 기반으로 원페이지 대시보드용 분석 리포트 작성
-- 일반인도 쉽게 이해할 수 있는 한국어로, 구체적이고 간결하게
-- related_companies: 이 기술을 영위/진출하는 주요 기업 5~8개 (한국 상장사 우선 + 글로벌 빅테크 + 스타트업)
+작업2) 관련 있는 자료만 기반으로 리포트 작성
+- 반드시 한국어로, 구체적이고 간결하게
+- summary 필드는 절대 비워두지 마세요. 최소 2문장 이상 작성하세요.
+- related_companies: 5~8개 (한국 상장사 우선)
 
 수집 데이터:
 ${itemList}
 
-반드시 아래 JSON 형식으로만 응답하세요 (마크다운 코드블록 없이 순수 JSON):
+반드시 아래 JSON 형식으로만 응답 (마크다운 없이 순수 JSON):
 {
-  "irrelevant_items": [관련 없는 항목 번호들],
-  "headline": "${keyword} 현황 한 문장",
-  "summary": "이번 주 핵심 동향 3줄 요약 (각 줄을 \\n으로 구분)",
-  ${hasNews ? `"news_highlights": [
-    {"title": "뉴스 핵심 제목 15자 이내", "insight": "왜 중요한지 1줄"},
-    {"title": "핵심 2", "insight": "1줄"},
-    {"title": "핵심 3", "insight": "1줄"}
-  ],` : `"news_highlights": [],`}
-  ${hasPaper ? `"paper_highlights": [
-    {"title": "논문 핵심 15자 이내", "insight": "연구 의미 1줄"},
-    {"title": "핵심 2", "insight": "1줄"},
-    {"title": "핵심 3", "insight": "1줄"}
-  ],` : `"paper_highlights": [],`}
-  ${hasLaw ? `"law_highlights": [
-    {"title": "정책/법안 핵심 15자 이내", "insight": "영향 1줄", "country": "KR/US"},
-    {"title": "핵심 2", "insight": "1줄", "country": "국가코드"},
-    {"title": "핵심 3", "insight": "1줄", "country": "국가코드"}
-  ],` : `"law_highlights": [],`}
-  ${hasPatent ? `"patent_highlights": [
-    {"title": "특허 핵심 15자 이내", "insight": "의미 1줄", "company": "출원 기업"},
-    {"title": "핵심 2", "insight": "1줄", "company": "기업"},
-    {"title": "핵심 3", "insight": "1줄", "company": "기업"}
-  ],` : `"patent_highlights": [],`}
+  "irrelevant_items": [],
+  "headline": "${keyword} 현황 핵심 한 문장",
+  "summary": "이번 주 핵심 동향 2~3줄. 반드시 작성. (줄바꿈은 \\n 사용)",
+  ${hasNews ? `"news_highlights": [{"title": "15자 이내", "insight": "왜 중요한지 1줄"},{"title": "핵심2", "insight": "1줄"},{"title": "핵심3", "insight": "1줄"}],` : '"news_highlights": [],'}
+  ${hasPaper ? `"paper_highlights": [{"title": "15자 이내", "insight": "연구 의미 1줄"},{"title": "핵심2", "insight": "1줄"},{"title": "핵심3", "insight": "1줄"}],` : '"paper_highlights": [],'}
+  ${hasLaw ? `"law_highlights": [{"title": "15자 이내", "insight": "영향 1줄", "country": "KR"},{"title": "핵심2", "insight": "1줄", "country": "KR"},{"title": "핵심3", "insight": "1줄", "country": "US"}],` : '"law_highlights": [],'}
+  ${hasPatent ? `"patent_highlights": [{"title": "15자 이내", "insight": "의미 1줄", "company": "기업명"},{"title": "핵심2", "insight": "1줄", "company": "기업"},{"title": "핵심3", "insight": "1줄", "company": "기업"}],` : '"patent_highlights": [],'}
   "related_companies": [
-    {"name": "기업명", "ticker": "종목코드(상장사만,없으면빈문자열)", "type": "대기업/스타트업", "role": "역할 1줄", "country": "KR"},
-    {"name": "기업2", "ticker": "", "type": "스타트업", "role": "역할", "country": "US"}
+    {"name": "기업명", "ticker": "종목코드또는빈문자열", "type": "대기업", "role": "역할 1줄", "country": "KR"}
   ],
   "prediction": "향후 1~3년 전망 3~5문장",
-  "sector": "관련 산업 분야",
+  "sector": "산업 분야",
   "time_horizon": "단기(1년)/중기(3년)/장기(5년+)",
-  "key_signals": ["핵심 신호1", "신호2", "신호3"],
-  "risk_factors": ["리스크1 구체적", "리스크2"],
-  "countries_leading": ["주도국가1", "주도국가2"],
-  "investment_tip": "투자자/사업자 핵심 조언 1~2문장"
+  "key_signals": ["신호1", "신호2", "신호3"],
+  "risk_factors": ["리스크1", "리스크2"],
+  "countries_leading": ["국가1", "국가2"],
+  "investment_tip": "핵심 조언 1~2문장"
 }`
 
   try {
@@ -148,10 +168,7 @@ ${itemList}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.5,
-            maxOutputTokens: 3000
-          }
+          generationConfig: { temperature: 0.4, maxOutputTokens: 3000 }
         })
       }
     )
@@ -162,32 +179,39 @@ ${itemList}
       throw new Error(`Gemini API ${res.status}`)
     }
 
-    const data = await res.json()
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    const data    = await res.json()
+    const text    = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
     const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
-    const parsed = JSON.parse(cleaned)
-    const report = { ...EMPTY_REPORT, ...parsed }
 
-    // ★ 필터링 결과 DB 반영
+    let parsed
+    try {
+      parsed = JSON.parse(cleaned)
+    } catch {
+      // JSON 파싱 실패 시 중괄호 사이만 추출 재시도
+      const match = cleaned.match(/\{[\s\S]*\}/)
+      parsed = match ? JSON.parse(match[0]) : {}
+    }
+
+    // ★ summary 안전 추출
+    const safeSummary = extractSummary(parsed, keyword)
+    const report = { ...EMPTY_REPORT, ...parsed, summary: safeSummary }
+
+    // 필터링 DB 반영
     const irrelevantSet = new Set((report.irrelevant_items || []).map(n => n - 1))
     const updatePromises = []
     for (let i = 0; i < evidenceList.length; i++) {
       const e = evidenceList[i]
       if (irrelevantSet.has(i)) {
-        updatePromises.push(
-          supabase.from('evidence').update({ relevance_score: 0 }).eq('id', e.id)
-        )
+        updatePromises.push(supabase.from('evidence').update({ relevance_score: 0 }).eq('id', e.id))
       } else {
         const newScore = Math.max(e.relevance_score || 0, 0.8)
-        updatePromises.push(
-          supabase.from('evidence').update({ relevance_score: newScore }).eq('id', e.id)
-        )
+        updatePromises.push(supabase.from('evidence').update({ relevance_score: newScore }).eq('id', e.id))
       }
     }
     await Promise.all(updatePromises)
 
     const filteredEvidence = evidenceList.filter((_, i) => !irrelevantSet.has(i))
-    console.log(`[${keyword}] 필터링: ${evidenceList.length}건 → ${filteredEvidence.length}건 (${irrelevantSet.size}건 제거)`)
+    console.log(`[${keyword}] 필터링: ${evidenceList.length} → ${filteredEvidence.length}건 | summary: "${safeSummary.slice(0, 30)}..."`)
 
     if (filteredEvidence.length === 0 && evidenceList.length > 0) {
       console.warn(`[${keyword}] 필터링 결과 0건 — 전체 유지`)
@@ -198,7 +222,7 @@ ${itemList}
   } catch (e) {
     console.error(`[${keyword}] AI 분석 오류:`, e.message)
     return {
-      report: { ...EMPTY_REPORT, summary: `"${keyword}" 분석 중 오류 발생` },
+      report: { ...EMPTY_REPORT, summary: `${keyword} 관련 최신 동향을 분석 중입니다.` },
       filteredEvidence: evidenceList
     }
   }
@@ -210,20 +234,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data: trends } = await supabase
-      .from('trends')
-      .select('id, keyword, score')
-      .order('updated_at', { ascending: true })
-      .limit(BATCH_SIZE)
+    // ★ 수정: 리포트 없는 트렌드 우선 처리 → 그 다음 오래된 것 순
+    const { data: trendsWithReport } = await supabase
+      .from('reports')
+      .select('trend_id')
 
-    if (!trends?.length) {
+    const analyzedIds = new Set((trendsWithReport || []).map(r => r.trend_id))
+
+    const { data: allTrends } = await supabase
+      .from('trends')
+      .select('id, keyword, score, updated_at')
+      .order('updated_at', { ascending: true })
+
+    if (!allTrends?.length) {
       return res.status(200).json({ ok: true, message: '분석할 트렌드 없음' })
     }
 
-    let analyzed = 0
+    // 리포트 없는 것 먼저, 그 다음 오래된 순
+    const unanalyzed = allTrends.filter(t => !analyzedIds.has(t.id))
+    const analyzed   = allTrends.filter(t =>  analyzedIds.has(t.id))
+    const targets    = [...unanalyzed, ...analyzed].slice(0, BATCH_SIZE)
+
+    let analyzedCount = 0
     const results = []
 
-    for (const trend of trends) {
+    for (const trend of targets) {
       const { data: evidenceList } = await supabase
         .from('evidence')
         .select('*')
@@ -231,16 +266,18 @@ export default async function handler(req, res) {
         .order('published_at', { ascending: false })
         .limit(30)
 
-      if (!evidenceList?.length) continue
+      if (!evidenceList?.length) {
+        console.log(`[${trend.keyword}] 근거자료 없음 — 건너뜀`)
+        continue
+      }
 
-      // ★ 단일 Gemini 호출: 필터링 + 리포트 동시 처리
       const { report, filteredEvidence } = await filterAndReport(
         trend.keyword, evidenceList, trend.score || 0
       )
 
-      const newScore = calcTrendScore(filteredEvidence)
+      const newScore   = calcTrendScore(filteredEvidence)
       const confidence = getConfidence(newScore)
-      const prevScore = trend.score || 0
+      const prevScore  = trend.score || 0
       const weeklyChange = newScore - prevScore
 
       await supabase.from('trends').update({
@@ -252,32 +289,31 @@ export default async function handler(req, res) {
       }).eq('id', trend.id)
 
       await supabase.from('reports').upsert({
-        trend_id: trend.id,
-        summary: report.summary,
-        prediction: report.prediction,
-        sector: report.sector,
-        time_horizon: report.time_horizon,
+        trend_id:        trend.id,
+        summary:         report.summary,
+        prediction:      report.prediction,
+        sector:          report.sector,
+        time_horizon:    report.time_horizon,
         evidence_summary: report,
-        generated_at: new Date().toISOString()
+        generated_at:    new Date().toISOString()
       }, { onConflict: 'trend_id' })
 
       results.push({
-        keyword: trend.keyword,
-        score: newScore,
-        change: weeklyChange,
+        keyword:    trend.keyword,
+        score:      newScore,
+        change:     weeklyChange,
         confidence,
-        filtered: `${filteredEvidence.length}/${evidenceList.length}`
+        filtered:   `${filteredEvidence.length}/${evidenceList.length}`,
+        summary_ok: report.summary.length > 10
       })
 
-      analyzed++
-
-      // ★ Rate Limit 방지: 트렌드 간 6초 딜레이
+      analyzedCount++
       await new Promise(r => setTimeout(r, API_DELAY))
     }
 
     res.status(200).json({
       ok: true,
-      message: `${analyzed}/${trends.length}개 트렌드 분석 완료 (배치 ${BATCH_SIZE})`,
+      message: `${analyzedCount}/${targets.length}개 트렌드 분석 완료 (배치 ${BATCH_SIZE})`,
       details: results
     })
   } catch (e) {
