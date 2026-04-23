@@ -134,23 +134,57 @@ async function filterAndReport(keyword, evidenceList, score) {
   const hasLaw    = (byType.law?.length    || 0) > 0 || (byType.policy?.length || 0) > 0
   const hasPatent = (byType.patent?.length || 0) > 0
 
-  const prompt = `당신은 글로벌 기술 트렌드 전문 분석가입니다.
-"${keyword}" 키워드로 수집된 근거 자료를 분석하세요. 트렌드 점수: ${score}/100
+  // 날짜 정보 추출 (최신 자료 날짜 표시용)
+  const latestDate = evidenceList
+    .filter(e => e.published_at)
+    .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))[0]?.published_at
+  const latestDateStr = latestDate ? new Date(latestDate).toLocaleDateString('ko-KR') : '최근'
+
+  const prompt = `당신은 한국 최고 수준의 기술 트렌드 애널리스트입니다. 미래에셋증권 리서치센터 수석 연구원처럼 분석하세요.
+
+분석 키워드: "${keyword}" | 수집 자료: ${evidenceList.length}건 | 최신 자료: ${latestDateStr}
+
+━━━ 수집 데이터 ━━━
+${itemList}
+━━━━━━━━━━━━━━━━━
 
 [작업1] 관련성 필터링
-- "${keyword}" 기술과 직접 관련 없는 항목 번호를 irrelevant_items에 넣으세요
-- 기준: 키워드가 우연히 포함, 다른 분야, 너무 일반적인 내용
+"${keyword}"와 직접 관련 없는 항목 번호를 irrelevant_items에 넣으세요.
+기준: 키워드가 우연히 포함된 것, 완전히 다른 분야, 광고성 내용
 
-[작업2] 리포트 작성 (관련 있는 자료만 기반)
-- 한국어로, 구체적이고 간결하게
-- summary는 반드시 2~3문장 이상 작성 (절대 비워두지 말 것)
-- 줄바꿈이 필요하면 반드시 \\n 이스케이프 사용 (실제 개행 금지)
+[작업2] 프리미엄 애널리스트 리포트 작성
+반드시 아래 기준을 지키세요:
 
-수집 데이터:
-${itemList}
+■ headline: 이번 주 "${keyword}" 시장에서 가장 중요한 변화를 한 문장으로. 반드시 구체적 수치나 기업명 포함.
+  좋은 예: "삼성전자 HBM4 3분기 양산 확정, 미국 수출규제 완화 기대감에 국내 반도체 수주 급증"
+  나쁜 예: "반도체 기술이 발전하고 있습니다"
 
-아래 JSON 형식으로만 응답 (마크다운 없이, 문자열 내 실제 개행 절대 금지):
-{"irrelevant_items":[],"headline":"${keyword} 현황 핵심 한 문장","summary":"핵심 동향 2~3문장 (줄바꿈은 \\n만 사용)",${hasNews ? `"news_highlights":[{"title":"15자이내","insight":"왜 중요한지 1줄"},{"title":"핵심2","insight":"1줄"},{"title":"핵심3","insight":"1줄"}],` : '"news_highlights":[],'}${hasPaper ? `"paper_highlights":[{"title":"15자이내","insight":"연구 의미 1줄"},{"title":"핵심2","insight":"1줄"},{"title":"핵심3","insight":"1줄"}],` : '"paper_highlights":[],'}${hasLaw ? `"law_highlights":[{"title":"15자이내","insight":"영향 1줄","country":"KR"},{"title":"핵심2","insight":"1줄","country":"KR"},{"title":"핵심3","insight":"1줄","country":"US"}],` : '"law_highlights":[],'}${hasPatent ? `"patent_highlights":[{"title":"15자이내","insight":"의미 1줄","company":"기업명"},{"title":"핵심2","insight":"1줄","company":"기업"},{"title":"핵심3","insight":"1줄","company":"기업"}],` : '"patent_highlights":[],'},"related_companies":[{"name":"기업명","ticker":"코드또는빈문자열","type":"대기업","role":"역할 1줄","country":"KR"}],"prediction":"향후 1~3년 전망 3~5문장","sector":"산업분야","time_horizon":"단기(1년)/중기(3년)/장기(5년+)","key_signals":["신호1","신호2","신호3"],"risk_factors":["리스크1","리스크2"],"countries_leading":["국가1","국가2"],"investment_tip":"핵심 조언 1~2문장"}`
+■ summary: 투자자/사업자가 지금 당장 알아야 할 핵심 3가지를 번호 없이 서술. 반드시 구체적 수치·기업명·날짜 포함. 일반론 금지. 줄바꿈은 \\n 사용.
+  좋은 예: "이번 주 국내 AI 스타트업 투자액이 전분기 대비 34% 증가하며 1.2조원을 돌파했다.\\n특히 의료·금융 분야 AI 규제 샌드박스 확대 법안이 국회 본회의를 통과하면서 B2B AI 솔루션 시장 본격 개화가 예상된다.\\nOpenAI의 GPT-5 출시 이후 국내 기업의 API 도입 문의가 월 3배 급증한 것으로 파악됐다."
+  나쁜 예: "생성형AI는 다양한 분야에서 혁신을 주도하고 있습니다"
+
+${hasNews ? `■ news_highlights: 수집된 뉴스 중 가장 임팩트 큰 3건. title은 핵심만 15자 이내, insight는 "왜 지금 중요한가"를 투자자 관점에서 1줄.` : ''}
+${hasPaper ? `■ paper_highlights: 수집된 논문 중 산업 파급력 큰 3건. title 15자 이내, insight는 "이 연구가 어떤 사업 기회를 만드는가" 1줄.` : ''}
+${hasLaw ? `■ law_highlights: 수집된 법안/정책 중 시장 영향 큰 3건. title 15자 이내, insight는 "이 법안이 통과되면 누가 이득/손해인가" 1줄.` : ''}
+${hasPatent ? `■ patent_highlights: 수집된 특허 중 기술 경쟁력 변화를 보여주는 3건. title 15자 이내, insight는 "이 특허가 시장 판도를 어떻게 바꾸는가" 1줄.` : ''}
+
+■ related_companies: 이 기술로 직접 수혜/피해를 받는 기업 5~8개. 한국 상장사 우선, 종목코드 필수 기재. role은 "왜 지금 주목해야 하는가" 구체적으로.
+
+■ prediction: 향후 6개월~3년 시나리오. 낙관/기본/비관 3가지 시나리오로 구분해서 서술. 줄바꿈은 \\n 사용.
+  예: "[낙관] 규제 완화 + 수요 급증 시 2026년 시장 규모 15조원 돌파 가능\\n[기본] 현재 성장세 유지 시 연 30% 성장, 2025년 8조원 규모\\n[비관] 글로벌 경기침체 시 투자 위축, 성장률 10% 이하로 둔화"
+
+■ key_signals: 지금 당장 주목해야 할 시장 신호 3가지. 추상적 표현 금지, 구체적 사건/수치로.
+  좋은 예: ["삼성 HBM4 양산 3Q 확정", "국회 AI기본법 본회의 통과", "미국 반도체 보조금 2차 신청 시작"]
+  나쁜 예: ["기술 발전", "규제 변화", "시장 성장"]
+
+■ risk_factors: 지금 가장 현실적인 리스크 2~3가지. 구체적 사건 기반으로.
+
+■ investment_tip: 지금 이 트렌드에 투자/사업 진입을 고민하는 사람에게 한 줄 조언. 타이밍과 방식 포함.
+  좋은 예: "법안 통과 시점(예상 2분기)을 트리거로 의료AI 솔루션 기업 비중 확대 권고, 단 임상 데이터 보유 여부 필수 확인"
+  나쁜 예: "관련 기업에 관심을 가져보세요"
+
+아래 JSON으로만 응답 (마크다운 없이, 문자열 내 실제 개행 절대 금지, \\n만 사용):
+{"irrelevant_items":[],"headline":"구체적 수치/기업명 포함 한 문장","summary":"구체적 수치·기업명·날짜 포함 3문장 (\\n 구분)",${hasNews ? `"news_highlights":[{"title":"15자이내","insight":"투자자 관점 1줄"},{"title":"핵심2","insight":"1줄"},{"title":"핵심3","insight":"1줄"}],` : '"news_highlights":[],'}${hasPaper ? `"paper_highlights":[{"title":"15자이내","insight":"사업기회 관점 1줄"},{"title":"핵심2","insight":"1줄"},{"title":"핵심3","insight":"1줄"}],` : '"paper_highlights":[],'}${hasLaw ? `"law_highlights":[{"title":"15자이내","insight":"수혜/피해 1줄","country":"KR"},{"title":"핵심2","insight":"1줄","country":"KR"},{"title":"핵심3","insight":"1줄","country":"US"}],` : '"law_highlights":[],'}${hasPatent ? `"patent_highlights":[{"title":"15자이내","insight":"시장판도 변화 1줄","company":"기업명"},{"title":"핵심2","insight":"1줄","company":"기업"},{"title":"핵심3","insight":"1줄","company":"기업"}],` : '"patent_highlights":[],'},"related_companies":[{"name":"기업명","ticker":"종목코드필수","type":"대기업/중견/스타트업","role":"지금 주목해야 하는 이유 1줄","country":"KR"}],"prediction":"[낙관]~\\n[기본]~\\n[비관]~","sector":"구체적 산업분야","time_horizon":"단기(1년)/중기(3년)/장기(5년+)","key_signals":["구체적 사건1","구체적 사건2","구체적 사건3"],"risk_factors":["구체적 리스크1","구체적 리스크2"],"countries_leading":["국가1","국가2"],"investment_tip":"타이밍과 방식 포함 한 줄 조언"}`
 
   try {
     const res  = await callGemini(prompt)
