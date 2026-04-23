@@ -21,25 +21,48 @@ const EMPTY_REPORT = {
 // ── 점수 계산 (타입 다양성 + 국가 다양성 + 최신성) ──
 function calcTrendScore(evidenceList) {
   if (!evidenceList.length) return 0
+
   const count = { paper: 0, patent: 0, law: 0, policy: 0, news: 0 }
   for (const e of evidenceList) {
     if (count[e.type] !== undefined) count[e.type]++
   }
-  let typeScore = 0
-  for (const [type, weight] of Object.entries(WEIGHTS)) {
-    typeScore += Math.min(Math.floor(count[type] / 5), 10) * weight * 10
-  }
-  const countries = new Set(evidenceList.map(e => e.country).filter(Boolean))
-  const globalBonus = countries.size >= 5 ? 20 : countries.size >= 3 ? 12 : countries.size >= 2 ? 6 : 0
-  const typeCount = Object.values(count).filter(v => v > 0).length
-  const diversityBonus = typeCount >= 4 ? 15 : typeCount >= 3 ? 8 : typeCount >= 2 ? 3 : 0
+
+  // ── 1. 볼륨 점수 (전체 근거 수, 최대 30점) ──
+  const total = evidenceList.length
+  const volumeScore = total >= 50 ? 30 : total >= 30 ? 22 : total >= 15 ? 14 : total >= 5 ? 7 : 2
+
+  // ── 2. 최신성 점수 (7일 이내 자료 비율, 최대 25점) ──
   const now = Date.now()
-  const recentCount = evidenceList.filter(e => {
+  const veryRecent = evidenceList.filter(e => {
+    if (!e.published_at) return false
+    return (now - new Date(e.published_at).getTime()) < 7 * 24 * 60 * 60 * 1000
+  }).length
+  const recent = evidenceList.filter(e => {
     if (!e.published_at) return false
     return (now - new Date(e.published_at).getTime()) < 30 * 24 * 60 * 60 * 1000
   }).length
-  const recencyBonus = recentCount >= evidenceList.length * 0.5 ? 10 : 0
-  return Math.min(Math.round(typeScore + globalBonus + diversityBonus + recencyBonus), 100)
+  const recencyRatio = veryRecent / Math.max(total, 1)
+  const recencyScore = recencyRatio >= 0.5 ? 25
+    : recencyRatio >= 0.3 ? 18
+    : (recent / total) >= 0.5 ? 12
+    : (recent / total) >= 0.3 ? 6 : 2
+
+  // ── 3. 국가 다양성 점수 (최대 20점) ──
+  const countries = new Set(evidenceList.map(e => e.country).filter(Boolean))
+  const geoScore = countries.size >= 5 ? 20 : countries.size >= 4 ? 16
+    : countries.size >= 3 ? 11 : countries.size >= 2 ? 6 : 2
+
+  // ── 4. 타입 다양성 점수 (있는 타입 수, 최대 15점) ──
+  const typeCount = Object.values(count).filter(v => v > 0).length
+  const typeScore = typeCount >= 4 ? 15 : typeCount >= 3 ? 10 : typeCount >= 2 ? 5 : 2
+
+  // ── 5. 고신호 타입 보너스 (법안/특허 있으면 +10) ──
+  const highSignalBonus = (count.law + count.policy) >= 2 ? 6
+    : (count.law + count.policy) >= 1 ? 3 : 0
+  const patentBonus = count.patent >= 3 ? 4 : count.patent >= 1 ? 2 : 0
+
+  const raw = volumeScore + recencyScore + geoScore + typeScore + highSignalBonus + patentBonus
+  return Math.min(Math.round(raw), 100)
 }
 
 function getConfidence(score) {
