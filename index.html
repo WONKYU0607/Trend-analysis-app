@@ -102,6 +102,15 @@ main { padding-top:48px; min-height:100vh; }
 .sc-hi  { color:var(--green); }
 .sc-mid { color:var(--amber); }
 .sc-lo  { color:var(--text3); }
+.sc-label {
+  font-size:9px; font-weight:700; padding:2px 7px; border-radius:4px;
+  letter-spacing:.04em; white-space:nowrap; text-transform:uppercase;
+}
+.sc-urgent { background:rgba(22,163,74,.1);   color:#16a34a; }  /* 80+ 초록 — 지금 당장 */
+.sc-rising { background:rgba(217,119,6,.1);   color:#d97706; }  /* 60+ 주황 — 상승 중 */
+.sc-watch  { background:rgba(26,86,219,.08);  color:#1a56db; }  /* 40+ 파랑 — 모니터링 */
+.sc-early  { background:rgba(0,0,0,.05);      color:#a09d96; }  /* 20+ 회색 — 초기 */
+.sc-idle   { background:rgba(0,0,0,.04);      color:#c0bdb6; }  /* ~20 연회색 — 관망 */
 .badge  { font-family:var(--mono); font-size:9px; font-weight:500; padding:1px 5px; border-radius:4px; }
 .b-up   { color:var(--green); background:rgba(22,163,74,.1); }
 .b-dn   { color:var(--red);   background:rgba(220,38,38,.1); }
@@ -362,6 +371,20 @@ function esc(s) {
   const d = document.createElement('div'); d.textContent = s; return d.innerHTML
 }
 function scClass(s) { return s >= 70 ? 'sc-hi' : s >= 40 ? 'sc-mid' : 'sc-lo' }
+function scoreLabel(s) {
+  if (s >= 80) return { cls: 'sc-urgent', text: '● 긴급 주목' }
+  if (s >= 60) return { cls: 'sc-rising', text: '● 상승 가속' }
+  if (s >= 40) return { cls: 'sc-watch',  text: '● 모니터링' }
+  if (s >= 20) return { cls: 'sc-early',  text: '● 초기 단계' }
+  return               { cls: 'sc-idle',  text: '● 관망' }
+}
+function scoreMeaning(s) {
+  if (s >= 80) return '지금 당장 주목해야 할 기술'
+  if (s >= 60) return '진입 검토 시점'
+  if (s >= 40) return '성장 모니터링 권장'
+  if (s >= 20) return '장기 관점 관찰'
+  return               '동향 침체 중'
+}
 function scColor(s) { return s >= 70 ? 'var(--green)' : s >= 40 ? 'var(--amber)' : 'var(--text3)' }
 function badge(v) {
   v = Math.round(v || 0)
@@ -395,9 +418,12 @@ function mkCard(t, idx) {
     ${hero ? `<div class="hero-badge">▲ 주간 급등 #1</div>` : ''}
     <div class="card-row">
       <div class="card-kw">${esc(t.keyword)}</div>
-      <div class="score-pill">
-        <span class="sc-num ${scClass(s)}">${s}</span>
-        ${badge(t.weekly_change)}
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span class="sc-label ${scoreLabel(s).cls}">${scoreLabel(s).text}</span>
+        <div class="score-pill">
+          <span class="sc-num ${scClass(s)}">${s}</span>
+          ${badge(t.weekly_change)}
+        </div>
       </div>
     </div>
     <div class="card-sum">${esc(r.summary || '분석 리포트 생성 중...')}</div>
@@ -554,11 +580,14 @@ async function openDetail(id) {
     <div class="score-bar">
       <div class="sc-big" style="color:${col}">${s}</div>
       <div class="sc-right">
-        <div class="sc-lbl">Trend Score</div>
+        <div class="sc-lbl">Trend Score — <span style="font-family:var(--sans)">${scoreMeaning(s)}</span></div>
         <div class="sc-gauge">
           <div class="sc-fill" style="width:${s}%;background:${col}"></div>
         </div>
-        ${trend.confidence_level ? `<div class="sc-conf">신뢰도: ${esc(trend.confidence_level)}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:5px">
+          <span class="sc-label ${scoreLabel(s).cls}">${scoreLabel(s).text}</span>
+          ${trend.confidence_level ? `<span style="font-size:11px;color:var(--text2)">신뢰도: ${esc(trend.confidence_level)}</span>` : ''}
+        </div>
       </div>
     </div>
 
