@@ -15,27 +15,19 @@ export default async function handler(req, res) {
   try {
     // ── 상세 조회 ──────────────────────────────────────────
     if (id) {
-      // trend
       const { data: trend, error: tErr } = await supabase
-        .from('trends')
-        .select('*')
-        .eq('id', id)
-        .single()
+        .from('trends').select('*').eq('id', id).single()
       if (tErr || !trend) return res.status(404).json({ error: 'not found' })
 
-      // report
       const { data: report } = await supabase
-        .from('reports')
-        .select('*')
-        .eq('trend_id', id)
-        .single()
+        .from('reports').select('*').eq('trend_id', id).single()
 
-      // evidence — 타입별로 분류
       const { data: evRows } = await supabase
-        .from('evidence')
-        .select('*')
+        .from('evidence').select('*')
         .eq('trend_id', id)
+        .gt('relevance_score', 0)              // 관련없음(0점) 제외
         .order('relevance_score', { ascending: false })
+        .order('published_at', { ascending: false })
         .limit(100)
 
       const evidence = { paper: [], patent: [], law: [], policy: [], news: [] }
@@ -49,27 +41,40 @@ export default async function handler(req, res) {
     // ── 목록 조회 ──────────────────────────────────────────
     const { data: trends, error: lErr } = await supabase
       .from('trends')
-      .select(`
-        id, keyword, category, score, prev_score, weekly_change,
-        confidence_level, updated_at,
-        reports ( summary, sector, time_horizon )
-      `)
+      .select('id, keyword, category, score, prev_score, weekly_change, confidence_level, updated_at')
       .order('score', { ascending: false })
       .limit(60)
 
     if (lErr) throw lErr
 
+    // ★ join 대신 별도 쿼리 — Supabase join 타입 불일치 버그 우회
+    const { data: reports } = await supabase
+      .from('reports')
+      .select('trend_id, summary, sector, time_horizon')
+
+    const reportMap = {}
+    for (const r of reports || []) {
+      reportMap[r.trend_id] = r
+    }
+
+    // trends에 report 붙이기
+    const trendsWithReport = (trends || []).map(t => ({
+      ...t,
+      report: reportMap[t.id] || null
+    }))
+
     // stats
     const { data: evCount } = await supabase.rpc('get_evidence_count')
     const { data: countries } = await supabase
-      .from('evidence')
-      .select('country')
-    const countryCount = new Set((countries || []).map(r => r.country).filter(Boolean)).size
+      .from('evidence').select('country')
+    const countryCount = new Set(
+      (countries || []).map(r => r.country).filter(Boolean)
+    ).size
 
     return res.status(200).json({
-      trends: trends || [],
+      trends: trendsWithReport,
       stats: {
-        trendCount: trends?.length || 0,
+        trendCount:    trendsWithReport.length,
         evidenceCount: Number(evCount) || 0,
         countryCount
       }
