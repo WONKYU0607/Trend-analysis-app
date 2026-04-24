@@ -215,11 +215,50 @@ main { padding-top:48px; min-height:100vh; }
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
 
 .rpt-tip {
-  font-size:12px; color:var(--amber); line-height:1.75;
-  padding:11px 14px; background:rgba(217,119,6,.05);
-  border:1px solid rgba(217,119,6,.15); border-radius:8px;
+  font-size:13px; color:var(--text); line-height:1.8;
+  padding:16px 18px; background:linear-gradient(135deg,rgba(26,86,219,.04),rgba(26,86,219,.02));
+  border:1.5px solid rgba(26,86,219,.2); border-radius:10px;
+  position:relative;
+}
+.rpt-tip-label {
+  font-size:10px; font-weight:700; letter-spacing:.08em;
+  color:var(--accent); text-transform:uppercase; margin-bottom:6px;
 }
 .rpt-outlook { font-size:13px; color:var(--text); line-height:1.9; }
+
+/* 시나리오 */
+.scenario-grid { display:flex; flex-direction:column; gap:6px; }
+.scenario-item { padding:10px 14px; border-radius:8px; border-left:3px solid; }
+.scenario-bull { background:rgba(22,163,74,.05);  border-color:var(--green); }
+.scenario-base { background:rgba(26,86,219,.04);  border-color:var(--accent); }
+.scenario-bear { background:rgba(220,38,38,.04);  border-color:var(--red); }
+.scenario-lbl  { font-size:10px; font-weight:700; letter-spacing:.06em; margin-bottom:3px; }
+.scenario-bull .scenario-lbl { color:var(--green); }
+.scenario-base .scenario-lbl { color:var(--accent); }
+.scenario-bear .scenario-lbl { color:var(--red); }
+.scenario-txt  { font-size:12px; color:var(--text2); line-height:1.6; }
+
+/* 기업 카드 */
+.company-grid { display:flex; flex-direction:column; gap:5px; }
+.company-item {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 14px; background:var(--surface2);
+  border:1px solid var(--border); border-radius:8px;
+}
+.company-flag { font-size:16px; flex-shrink:0; }
+.company-info { flex:1; min-width:0; }
+.company-name { font-size:13px; font-weight:500; color:var(--text); }
+.company-ticker {
+  font-family:var(--mono); font-size:10px; color:var(--accent);
+  background:rgba(26,86,219,.08); padding:1px 6px; border-radius:3px; margin-left:5px;
+}
+.company-type { font-size:10px; color:var(--text3); margin-left:4px; }
+.company-role { font-size:11px; color:var(--text2); margin-top:2px; line-height:1.4; }
+
+/* 구분선 섹션 */
+.rpt-divider {
+  height:1px; background:var(--border); margin:4px 0 20px;
+}
 
 /* ── SEARCH ── */
 .search-wrap { max-width:640px; margin:0 auto; padding:28px 16px; }
@@ -529,8 +568,8 @@ async function openDetail(id) {
     const evFirst = allEv.slice(0, 5)
     const evRest  = allEv.slice(5)
 
-    // 관련 기업
-    const companySection = companies.length ? `
+    // 관련 기업 (아래 companyHTML로 대체됨)
+    const companySection_unused = companies.length ? `
     <div class="rpt-sec">
       <div class="rpt-sec-t">🏢 관련 기업</div>
       <div class="ev-list">
@@ -559,108 +598,139 @@ async function openDetail(id) {
       </div>`
     }
 
+    // 시나리오 파싱 (낙관/기본/비관)
+    function parseScenarios(text) {
+      if (!text) return null
+      const bull = text.match(/\[낙관\](.*?)(?=\[기본\]|\[비관\]|$)/s)?.[1]?.trim()
+      const base = text.match(/\[기본\](.*?)(?=\[낙관\]|\[비관\]|$)/s)?.[1]?.trim()
+      const bear = text.match(/\[비관\](.*?)(?=\[낙관\]|\[기본\]|$)/s)?.[1]?.trim()
+      if (!bull && !base && !bear) return null
+      return { bull, base, bear }
+    }
+    const scenarios = parseScenarios(prediction)
+
+    // 관련 기업 렌더링
+    const companyHTML = companies.length ? `
+    <div class="rpt-sec">
+      <div class="rpt-sec-t">관련 기업</div>
+      <div class="company-grid">
+        ${companies.map(c => `
+        <div class="company-item">
+          <div class="company-flag">${FLAGS[c.country] || '🌐'}</div>
+          <div class="company-info">
+            <div class="company-name">
+              ${esc(c.name)}
+              ${c.ticker ? `<span class="company-ticker">${esc(c.ticker)}</span>` : ''}
+              ${c.type   ? `<span class="company-type">${esc(c.type)}</span>` : ''}
+            </div>
+            <div class="company-role">${esc(c.role || '')}</div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>` : ''
+
     document.getElementById('detailBody').innerHTML = `
 
-    <!-- 리포트 헤더 -->
+    <!-- ① 리포트 헤더 -->
     <div class="rpt-hdr">
       <div class="rpt-kw">${esc(trend.keyword)}</div>
       ${headline ? `<div class="rpt-hl">${esc(headline)}</div>` : ''}
       <div class="rpt-meta">
         <div class="rpt-mi">
-          트렌드 점수
-          <span class="rpt-mv" style="color:${col}">${s}/100</span>
+          점수 <span class="rpt-mv" style="color:${col}">${s}/100</span>
           ${badge(trend.weekly_change)}
+          <span class="sc-label ${scoreLabel(s).cls}" style="margin-left:4px">${scoreLabel(s).text}</span>
         </div>
-        ${report?.sector       ? `<div class="rpt-mi">산업 <span class="rpt-mv">${esc(report.sector)}</span></div>`       : ''}
+        ${report?.sector       ? `<div class="rpt-mi">산업 <span class="rpt-mv">${esc(report.sector)}</span></div>` : ''}
         ${report?.time_horizon ? `<div class="rpt-mi">시계 <span class="rpt-mv">${esc(report.time_horizon)}</span></div>` : ''}
       </div>
     </div>
 
-    <!-- 점수바 -->
+    <!-- ② 점수바 -->
     <div class="score-bar">
       <div class="sc-big" style="color:${col}">${s}</div>
       <div class="sc-right">
-        <div class="sc-lbl">Trend Score — <span style="font-family:var(--sans)">${scoreMeaning(s)}</span></div>
-        <div class="sc-gauge">
-          <div class="sc-fill" style="width:${s}%;background:${col}"></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:5px">
-          <span class="sc-label ${scoreLabel(s).cls}">${scoreLabel(s).text}</span>
-          ${trend.confidence_level ? `<span style="font-size:11px;color:var(--text2)">신뢰도: ${esc(trend.confidence_level)}</span>` : ''}
-        </div>
+        <div class="sc-lbl">Trend Score — <span style="font-family:var(--sans);font-weight:400">${scoreMeaning(s)}</span></div>
+        <div class="sc-gauge"><div class="sc-fill" style="width:${s}%;background:${col}"></div></div>
+        ${trend.confidence_level ? `<div class="sc-conf" style="margin-top:4px">신뢰도: ${esc(trend.confidence_level)}</div>` : ''}
       </div>
     </div>
 
-    <!-- 핵심 요약 -->
+    <!-- ③ 핵심 요약 -->
     ${summary ? `
     <div class="rpt-sec">
       <div class="rpt-sec-t">핵심 요약</div>
       <div class="rpt-summary">${esc(summary).replace(/\n/g,'<br>')}</div>
     </div>` : ''}
 
-    <!-- 근거 자료 (뉴스·논문·법안·특허 통합) -->
-    ${allEv.length ? `
+    <!-- ④ 투자 포인트 (최상단 강조) -->
+    ${investTip ? `
     <div class="rpt-sec">
-      <div class="rpt-sec-t">근거 자료 — 논문·뉴스·법안·특허 (${allEv.length}건)</div>
-      <div class="ev-list">
-        ${evFirst.map(e => mkEvItem(e, false)).join('')}
+      <div class="rpt-sec-t">투자 포인트</div>
+      <div class="rpt-tip">
+        <div class="rpt-tip-label">💡 ANALYST PICK</div>
+        ${esc(investTip)}
       </div>
-      ${evRest.length ? `
-      <div id="evMore" style="display:none">
-        <div class="ev-list" style="margin-top:5px">
-          ${evRest.map(e => mkEvItem(e, false)).join('')}
-        </div>
-      </div>
-      <button class="ev-more" onclick="toggleMore(this, ${evRest.length})">
-        더보기 +${evRest.length}건 ▼
-      </button>` : ''}
     </div>` : ''}
 
-    <!-- AI 하이라이트 (카테고리별) -->
+    <!-- ⑤ 핵심 신호 / 리스크 -->
+    ${(signals.length || risks.length) ? `
+    <div class="two-col">
+      ${signals.length ? `
+      <div class="rpt-sec" style="margin-bottom:0">
+        <div class="rpt-sec-t">📡 핵심 신호</div>
+        <div class="chip-list">${signals.map(x => `<span class="chip c-sig">${esc(x)}</span>`).join('')}</div>
+      </div>` : ''}
+      ${risks.length ? `
+      <div class="rpt-sec" style="margin-bottom:0">
+        <div class="rpt-sec-t">⚠️ 리스크</div>
+        <div class="chip-list">${risks.map(x => `<span class="chip c-risk">${esc(x)}</span>`).join('')}</div>
+      </div>` : ''}
+    </div>` : ''}
+
+    <!-- ⑥ 향후 시나리오 -->
+    ${scenarios ? `
+    <div class="rpt-sec">
+      <div class="rpt-sec-t">향후 시나리오</div>
+      <div class="scenario-grid">
+        ${scenarios.bull ? `<div class="scenario-item scenario-bull"><div class="scenario-lbl">▲ 낙관</div><div class="scenario-txt">${esc(scenarios.bull)}</div></div>` : ''}
+        ${scenarios.base ? `<div class="scenario-item scenario-base"><div class="scenario-lbl">→ 기본</div><div class="scenario-txt">${esc(scenarios.base)}</div></div>` : ''}
+        ${scenarios.bear ? `<div class="scenario-item scenario-bear"><div class="scenario-lbl">▼ 비관</div><div class="scenario-txt">${esc(scenarios.bear)}</div></div>` : ''}
+      </div>
+    </div>` : prediction ? `
+    <div class="rpt-sec">
+      <div class="rpt-sec-t">향후 전망</div>
+      <div class="rpt-outlook">${esc(prediction).replace(/\n/g,'<br>')}</div>
+    </div>` : ''}
+
+    <!-- ⑦ 관련 기업 -->
+    ${companyHTML}
+
+    <!-- ⑧ 주도 국가 -->
+    ${countries.length ? `
+    <div class="rpt-sec">
+      <div class="rpt-sec-t">주도 국가</div>
+      <div class="chip-list">${countries.map(c => `<span class="chip c-country">${FLAGS[c] || '🌐'} ${esc(c)}</span>`).join('')}</div>
+    </div>` : ''}
+
+    <div class="rpt-divider"></div>
+
+    <!-- ⑨ AI 하이라이트 -->
     ${hlSection('📰', '뉴스 하이라이트', newsH)}
     ${hlSection('📄', '논문 하이라이트', paperH)}
     ${hlSection('⚖️', '정책·법안 하이라이트', lawH)}
     ${hlSection('📋', '특허 하이라이트', patentH)}
 
-    <!-- 관련 기업 -->
-    ${companySection}
-
-    <!-- 핵심 신호 / 리스크 -->
-    ${(signals.length || risks.length) ? `
-    <div class="two-col">
-      ${signals.length ? `
-      <div class="rpt-sec" style="margin-bottom:0">
-        <div class="rpt-sec-t">핵심 신호</div>
-        <div class="chip-list">${signals.map(x => `<span class="chip c-sig">${esc(x)}</span>`).join('')}</div>
-      </div>` : ''}
-      ${risks.length ? `
-      <div class="rpt-sec" style="margin-bottom:0">
-        <div class="rpt-sec-t">리스크 요인</div>
-        <div class="chip-list">${risks.map(x => `<span class="chip c-risk">${esc(x)}</span>`).join('')}</div>
-      </div>` : ''}
-    </div>` : ''}
-
-    <!-- 주도 국가 -->
-    ${countries.length ? `
+    <!-- ⑩ 근거 자료 (맨 아래) -->
+    ${allEv.length ? `
     <div class="rpt-sec">
-      <div class="rpt-sec-t">주도 국가</div>
-      <div class="chip-list">
-        ${countries.map(c => `<span class="chip c-country">${FLAGS[c] || '🌐'} ${esc(c)}</span>`).join('')}
+      <div class="rpt-sec-t">근거 자료 — 논문·뉴스·법안·특허 (${allEv.length}건)</div>
+      <div class="ev-list">${evFirst.map(e => mkEvItem(e, false)).join('')}</div>
+      ${evRest.length ? `
+      <div id="evMore" style="display:none">
+        <div class="ev-list" style="margin-top:5px">${evRest.map(e => mkEvItem(e, false)).join('')}</div>
       </div>
-    </div>` : ''}
-
-    <!-- 투자 포인트 -->
-    ${investTip ? `
-    <div class="rpt-sec">
-      <div class="rpt-sec-t">💡 투자 포인트</div>
-      <div class="rpt-tip">${esc(investTip)}</div>
-    </div>` : ''}
-
-    <!-- 향후 전망 -->
-    ${prediction ? `
-    <div class="rpt-sec">
-      <div class="rpt-sec-t">🔮 향후 전망</div>
-      <div class="rpt-outlook">${esc(prediction).replace(/\n/g,'<br>')}</div>
+      <button class="ev-more" onclick="toggleMore(this, ${evRest.length})">더보기 +${evRest.length}건 ▼</button>` : ''}
     </div>` : ''}
     `
 
