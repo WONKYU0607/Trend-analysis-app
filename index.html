@@ -324,6 +324,92 @@ main { padding-top:48px; min-height:100vh; }
   .two-col   { grid-template-columns:1fr; }
   .rpt-kw    { font-size:22px; }
 }
+
+/* ── 데이터 시각화 ── */
+.viz-wrap   { max-width:680px; margin:0 auto; padding:20px 16px 60px; }
+.viz-header { margin-bottom:16px; }
+.viz-title  { font-family:var(--serif); font-size:20px; font-weight:700; }
+.viz-subtitle { font-size:11px; color:var(--text3); margin-top:3px; font-family:var(--mono); }
+.viz-sec-t  {
+  font-size:10px; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--text3); margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border);
+}
+.viz-note   { font-size:11px; color:var(--text3); margin-bottom:8px; margin-top:-6px; }
+
+/* 급등 배너 */
+.hot-banner {
+  background:linear-gradient(135deg,rgba(22,163,74,.08),rgba(22,163,74,.04));
+  border:1px solid rgba(22,163,74,.2); border-radius:10px;
+  padding:10px 14px; margin-bottom:16px; font-size:12px; color:var(--text);
+}
+
+/* 카운터 */
+.counter-grid {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:20px;
+}
+.counter-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  padding:12px 10px; text-align:center;
+}
+.counter-val { font-family:var(--mono); font-size:20px; font-weight:500; color:var(--text); }
+.counter-lbl { font-size:10px; color:var(--text3); margin-top:3px; }
+.counter-sub { font-size:9px; color:var(--accent); margin-top:2px; font-family:var(--mono); }
+
+/* 트렌드 바 */
+.trend-bars  { display:flex; flex-direction:column; gap:5px; }
+.trend-bar-item {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:10px 12px; cursor:pointer; transition:border-color .15s;
+}
+.trend-bar-item:hover { border-color:var(--accent); }
+.tb-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.tb-kw     { font-size:13px; font-weight:500; color:var(--text); }
+.tb-total  { font-family:var(--mono); font-size:12px; font-weight:500; }
+.tb-bars   { display:flex; gap:3px; height:6px; border-radius:3px; overflow:hidden; }
+.tb-seg    { height:100%; border-radius:2px; transition:width .4s; min-width:2px; }
+.tb-legend { display:flex; gap:10px; margin-top:5px; flex-wrap:wrap; }
+.tb-leg    { display:flex; align-items:center; gap:3px; font-size:10px; color:var(--text3); }
+.tb-dot    { width:7px; height:7px; border-radius:50%; }
+.tb-search { font-size:10px; color:var(--text3); font-family:var(--mono); }
+
+/* 검색 vs 데이터 */
+.search-vs-data { display:flex; flex-direction:column; gap:5px; }
+.svd-item {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:10px 14px;
+}
+.svd-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.svd-kw     { font-size:12px; font-weight:500; }
+.svd-meta   { display:flex; gap:10px; }
+.svd-badge  { font-size:10px; font-family:var(--mono); padding:1px 6px; border-radius:4px; }
+.svd-badge-up   { background:rgba(22,163,74,.1);  color:var(--green); }
+.svd-badge-dn   { background:rgba(220,38,38,.1);  color:var(--red); }
+.svd-badge-flat { background:rgba(0,0,0,.05);     color:var(--text3); }
+.svd-bars { display:grid; grid-template-columns:80px 1fr; gap:6px; align-items:center; }
+.svd-lbl  { font-size:10px; color:var(--text3); }
+.svd-bar  { height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+.svd-fill { height:100%; border-radius:3px; }
+
+/* 국가 차트 */
+.country-chart { display:flex; flex-direction:column; gap:4px; }
+.cc-item { display:flex; align-items:center; gap:10px; padding:6px 0; }
+.cc-flag { font-size:16px; width:24px; text-align:center; }
+.cc-name { font-size:12px; color:var(--text2); width:60px; flex-shrink:0; }
+.cc-bar  { flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+.cc-fill { height:100%; border-radius:3px; background:var(--accent); }
+.cc-cnt  { font-family:var(--mono); font-size:11px; color:var(--text3); width:40px; text-align:right; }
+
+/* 카테고리 차트 */
+.category-chart { display:flex; flex-direction:column; gap:4px; }
+.cat-item { display:flex; align-items:center; gap:10px; padding:6px 0; }
+.cat-name { font-size:12px; color:var(--text2); width:90px; flex-shrink:0; }
+.cat-bar  { flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+.cat-fill { height:100%; border-radius:3px; background:var(--amber); }
+.cat-cnt  { font-family:var(--mono); font-size:11px; color:var(--text3); width:40px; text-align:right; }
+
+@media(max-width:480px) {
+  .counter-grid { grid-template-columns:repeat(2,1fr); }
+}
 </style>
 </head>
 <body>
@@ -332,6 +418,7 @@ main { padding-top:48px; min-height:100vh; }
   <div class="logo"><span>ATLAS</span> RESEARCH</div>
   <nav>
     <button class="active" data-page="home" onclick="gotoPage('home',this)">리서치</button>
+    <button data-page="viz" onclick="gotoPage('viz',this)">데이터</button>
     <button data-page="search" onclick="gotoPage('search',this)">탐색</button>
     <button data-page="alerts" onclick="gotoPage('alerts',this)">알림</button>
   </nav>
@@ -365,6 +452,60 @@ main { padding-top:48px; min-height:100vh; }
   <div class="report-wrap">
     <button class="back-btn" onclick="gotoHome()">← 목록으로</button>
     <div id="detailBody"></div>
+  </div>
+</div>
+
+<!-- 데이터 시각화 -->
+<div id="page-viz" class="page">
+  <div class="viz-wrap">
+    <div class="viz-header">
+      <div class="viz-title">실시간 데이터 현황</div>
+      <div class="viz-subtitle" id="vizUpdated">—</div>
+    </div>
+
+    <!-- 급등 알람 배너 -->
+    <div id="hotBanner" style="display:none" class="hot-banner"></div>
+
+    <!-- 상단 요약 카운터 -->
+    <div class="counter-grid" id="counterGrid">
+      <div class="counter-card">
+        <div class="counter-val" id="cNews">—</div>
+        <div class="counter-lbl">📰 뉴스</div>
+        <div class="counter-sub" id="cNewsW">이번주 —건</div>
+      </div>
+      <div class="counter-card">
+        <div class="counter-val" id="cPaper">—</div>
+        <div class="counter-lbl">📄 논문</div>
+        <div class="counter-sub" id="cPaperW">이번주 —건</div>
+      </div>
+      <div class="counter-card">
+        <div class="counter-val" id="cPatent">—</div>
+        <div class="counter-lbl">📋 특허</div>
+        <div class="counter-sub" id="cPatentW">이번주 —건</div>
+      </div>
+      <div class="counter-card">
+        <div class="counter-val" id="cLaw">—</div>
+        <div class="counter-lbl">⚖️ 법안</div>
+        <div class="counter-sub" id="cLawW">이번주 —건</div>
+      </div>
+    </div>
+
+    <!-- 트렌드별 데이터 현황 -->
+    <div class="viz-sec-t">트렌드별 데이터 현황</div>
+    <div id="trendBars" class="trend-bars"></div>
+
+    <!-- 검색량 vs 데이터량 -->
+    <div class="viz-sec-t" style="margin-top:20px">검색 관심도 vs 실제 데이터</div>
+    <div class="viz-note">네이버 검색 지수(0~100)와 수집된 근거자료 수를 비교합니다</div>
+    <div id="searchVsData" class="search-vs-data"></div>
+
+    <!-- 국가별 분포 -->
+    <div class="viz-sec-t" style="margin-top:20px">국가별 데이터 분포</div>
+    <div id="countryChart" class="country-chart"></div>
+
+    <!-- 카테고리별 분포 -->
+    <div class="viz-sec-t" style="margin-top:20px">카테고리별 분포</div>
+    <div id="categoryChart" class="category-chart"></div>
   </div>
 </div>
 
@@ -440,6 +581,7 @@ function gotoPage(name, btn) {
   document.getElementById('page-' + name).classList.add('active')
   if (btn) btn.classList.add('active')
   if (name === 'alerts') renderAlerts()
+  if (name === 'viz') loadViz()
   window.scrollTo(0, 0)
 }
 function gotoHome() {
@@ -799,6 +941,159 @@ function toast(msg) {
   const el = document.getElementById('toast')
   el.textContent = msg; el.classList.add('show')
   setTimeout(() => el.classList.remove('show'), 2200)
+}
+
+/* ── 국가 이모지 ── */
+const COUNTRY_FLAG = { KR:'🇰🇷', US:'🇺🇸', EU:'🇪🇺', JP:'🇯🇵', CN:'🇨🇳', GB:'🇬🇧', DE:'🇩🇪', FR:'🇫🇷', CA:'🇨🇦', global:'🌐' }
+const COUNTRY_NAME = { KR:'한국', US:'미국', EU:'유럽', JP:'일본', CN:'중국', GB:'영국', DE:'독일', FR:'프랑스', CA:'캐나다', global:'글로벌' }
+
+/* ── 데이터 시각화 로드 ── */
+async function loadViz() {
+  try {
+    const res = await fetch('/api/stats')
+    if (!res.ok) throw new Error('stats api error')
+    const { trends, daily, categories, hotTrends, countries } = await res.json()
+
+    document.getElementById('vizUpdated').textContent =
+      new Date().toLocaleDateString('ko-KR') + ' 기준'
+
+    // ① 카운터 집계
+    let totalNews=0, totalPaper=0, totalPatent=0, totalLaw=0
+    let weekNews=0,  weekPaper=0,  weekPatent=0,  weekLaw=0
+    for (const t of trends) {
+      totalNews   += t.news_count   || 0
+      totalPaper  += t.paper_count  || 0
+      totalPatent += t.patent_count || 0
+      totalLaw    += (t.law_count   || 0) + (t.policy_count || 0)
+      weekNews    += t.recent_7d    || 0
+    }
+    // 일별 데이터에서 주간 집계
+    const weekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString().slice(0,10)
+    for (const d of daily) {
+      if (d.day < weekAgo) continue
+      if (d.type === 'paper')  weekPaper  += d.count
+      if (d.type === 'patent') weekPatent += d.count
+      if (d.type === 'law' || d.type === 'policy') weekLaw += d.count
+    }
+
+    document.getElementById('cNews').textContent   = totalNews.toLocaleString()
+    document.getElementById('cPaper').textContent  = totalPaper.toLocaleString()
+    document.getElementById('cPatent').textContent = totalPatent.toLocaleString()
+    document.getElementById('cLaw').textContent    = totalLaw.toLocaleString()
+    document.getElementById('cNewsW').textContent  = `이번주 +${weekNews}건`
+    document.getElementById('cPaperW').textContent = `이번주 +${weekPaper}건`
+    document.getElementById('cPatentW').textContent= `이번주 +${weekPatent}건`
+    document.getElementById('cLawW').textContent   = `이번주 +${weekLaw}건`
+
+    // ② 급등 배너
+    if (hotTrends.length) {
+      const banner = document.getElementById('hotBanner')
+      banner.style.display = 'block'
+      banner.innerHTML = '🔥 <strong>급등 트렌드:</strong> ' +
+        hotTrends.map(t => {
+          const sc = t.search_change > 0 ? `검색 +${t.search_change}%` : ''
+          const wc = t.weekly_change > 0 ? `점수 +${t.weekly_change}` : ''
+          return `<strong>${esc(t.keyword)}</strong> (${[sc,wc].filter(Boolean).join(', ')})`
+        }).join(' · ')
+    }
+
+    // ③ 트렌드 바
+    const TYPE_COLORS = { news:'#1a56db', paper:'#16a34a', patent:'#d97706', law:'#dc2626', policy:'#5850ec' }
+    const TYPE_LABELS = { news:'뉴스', paper:'논문', patent:'특허', law:'법안', policy:'정책' }
+    const maxTotal = Math.max(...trends.map(t => t.total_evidence || 0), 1)
+
+    document.getElementById('trendBars').innerHTML = trends
+      .sort((a,b) => (b.total_evidence||0) - (a.total_evidence||0))
+      .map(t => {
+        const total = t.total_evidence || 0
+        const types = ['news','paper','patent','law','policy']
+        const counts = {
+          news: t.news_count||0, paper: t.paper_count||0,
+          patent: t.patent_count||0, law: (t.law_count||0)+(t.policy_count||0), policy: 0
+        }
+        const segs = types.filter(tp => counts[tp] > 0).map(tp => {
+          const w = Math.round((counts[tp] / Math.max(total,1)) * 100)
+          return `<div class="tb-seg" style="width:${w}%;background:${TYPE_COLORS[tp]}" title="${TYPE_LABELS[tp]}:${counts[tp]}건"></div>`
+        }).join('')
+
+        const legend = types.filter(tp => counts[tp] > 0).map(tp =>
+          `<div class="tb-leg"><div class="tb-dot" style="background:${TYPE_COLORS[tp]}"></div>${TYPE_LABELS[tp]} ${counts[tp]}</div>`
+        ).join('')
+
+        const sc = t.search_index ? `검색지수 ${Math.round(t.search_index)}` : ''
+        const sChange = t.search_change > 0 ? `▲${t.search_change}%` : t.search_change < 0 ? `▼${Math.abs(t.search_change)}%` : ''
+
+        return `
+        <div class="trend-bar-item" onclick="openDetail('${t.id}')">
+          <div class="tb-header">
+            <span class="tb-kw">${esc(t.keyword)}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              ${sc ? `<span class="tb-search">${sc} ${sChange}</span>` : ''}
+              <span class="tb-total" style="color:${total>50?'var(--green)':total>20?'var(--amber)':'var(--text3)'}">${total}건</span>
+            </div>
+          </div>
+          <div class="tb-bars">${segs}</div>
+          <div class="tb-legend">${legend}</div>
+        </div>`
+      }).join('')
+
+    // ④ 검색 vs 데이터
+    const maxSearch = Math.max(...trends.map(t => t.search_index||0), 1)
+    const maxEv     = Math.max(...trends.map(t => t.total_evidence||0), 1)
+    document.getElementById('searchVsData').innerHTML = trends
+      .filter(t => t.search_index > 0 || t.total_evidence > 0)
+      .sort((a,b) => (b.search_index||0) - (a.search_index||0))
+      .map(t => {
+        const sIdx   = t.search_index || 0
+        const sCh    = t.search_change || 0
+        const evW    = Math.round((t.total_evidence||0) / maxEv * 100)
+        const srW    = Math.round(sIdx / maxSearch * 100)
+        const badgeCls = sCh > 10 ? 'svd-badge-up' : sCh < -10 ? 'svd-badge-dn' : 'svd-badge-flat'
+        const badgeTxt = sCh > 0 ? `▲${sCh}%` : sCh < 0 ? `▼${Math.abs(sCh)}%` : '—'
+        return `
+        <div class="svd-item">
+          <div class="svd-header">
+            <span class="svd-kw">${esc(t.keyword)}</span>
+            <div class="svd-meta">
+              ${sIdx > 0 ? `<span class="svd-badge ${badgeCls}">검색 ${badgeTxt}</span>` : ''}
+              <span class="svd-badge svd-badge-flat">자료 ${t.total_evidence||0}건</span>
+            </div>
+          </div>
+          <div class="svd-bars">
+            <div class="svd-lbl">검색 관심도</div>
+            <div class="svd-bar"><div class="svd-fill" style="width:${srW}%;background:var(--accent)"></div></div>
+            <div class="svd-lbl">수집 자료</div>
+            <div class="svd-bar"><div class="svd-fill" style="width:${evW}%;background:var(--green)"></div></div>
+          </div>
+        </div>`
+      }).join('')
+
+    // ⑤ 국가 차트
+    const sortedCountries = Object.entries(countries)
+      .sort((a,b) => b[1]-a[1]).slice(0, 8)
+    const maxCC = sortedCountries[0]?.[1] || 1
+    document.getElementById('countryChart').innerHTML = sortedCountries.map(([c, cnt]) => `
+      <div class="cc-item">
+        <div class="cc-flag">${COUNTRY_FLAG[c]||'🌐'}</div>
+        <div class="cc-name">${COUNTRY_NAME[c]||c}</div>
+        <div class="cc-bar"><div class="cc-fill" style="width:${Math.round(cnt/maxCC*100)}%"></div></div>
+        <div class="cc-cnt">${cnt.toLocaleString()}</div>
+      </div>`).join('')
+
+    // ⑥ 카테고리 차트
+    const sortedCats = Object.entries(categories)
+      .sort((a,b) => b[1].total-a[1].total)
+    const maxCat = sortedCats[0]?.[1]?.total || 1
+    document.getElementById('categoryChart').innerHTML = sortedCats.map(([cat, d]) => `
+      <div class="cat-item">
+        <div class="cat-name">${esc(cat)}</div>
+        <div class="cat-bar"><div class="cat-fill" style="width:${Math.round(d.total/maxCat*100)}%"></div></div>
+        <div class="cat-cnt">${d.total.toLocaleString()}</div>
+      </div>`).join('')
+
+  } catch (e) {
+    console.error('viz load error:', e)
+  }
 }
 
 /* ── 홈 로드 ── */
