@@ -6,8 +6,8 @@ const supabase = createClient(
 )
 
 const WEIGHTS   = { law: 0.30, patent: 0.25, paper: 0.25, policy: 0.10, news: 0.10 }
-const BATCH_SIZE  = 3
-const API_DELAY   = 15000   // 트렌드 간 15초 (429 방지)
+const BATCH_SIZE  = 5
+const API_DELAY   = 8000   // 트렌드 간 15초 (429 방지)
 const RETRY_DELAY = 35000   // 429 발생 시 35초 대기
 const MAX_RETRY   = 2
 
