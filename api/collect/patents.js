@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { TECH_KEYWORDS, toEn } from '../lib/keywords.js'
+import { shouldInclude, trustScore } from '../lib/trust.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -9,6 +10,42 @@ const supabase = createClient(
 function regionOf(country) {
   const map = { KR: 'Asia', JP: 'Asia', US: 'Americas', EU: 'Europe' }
   return map[country] || 'Global'
+}
+
+// ── USPTO 미국 특허 (키 불필요) ──
+async function fetchUSPTO(keyword, enKeyword) {
+  const url = `https://developer.uspto.gov/ibd-api/v1/patent/application?searchText=${encodeURIComponent(enKeyword)}&start=0&rows=15&dateRangeField=applDateText&dateRangeStart=2023-01-01&dateRangeEnd=2026-12-31`
+  try {
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    })
+    if (!res.ok) { console.error(`USPTO HTTP ${res.status}`); return [] }
+    const data = await res.json()
+    const results = []
+    for (const p of data.results || []) {
+      const title   = p.inventionTitle || ''
+      const appNo   = p.patentApplicationNumber || ''
+      const appDate = p.filingDate || ''
+      if (!title) continue
+
+      const { include, score } = shouldInclude(title, '', 'USPTO', 'patent', keyword)
+      if (!include) continue
+
+      results.push({
+        title,
+        summary: p.abstractText?.slice(0, 300) || null,
+        source_url: appNo
+          ? `https://patents.google.com/patent/US${appNo.replace(/\//g,'')}`
+          : `https://developer.uspto.gov`,
+        source_name: 'USPTO',
+        published_at: appDate || new Date().toISOString(),
+        country: 'US',
+        relevance_score: score,
+        trust_score: trustScore('USPTO', 'patent')
+      })
+    }
+    return results
+  } catch (e) { console.error('USPTO 오류:', e.message); return [] }
 }
 
 async function fetchKIPRIS(keyword) {
@@ -29,11 +66,15 @@ async function fetchKIPRIS(keyword) {
       const title = item.match(/<inventionTitle>([\s\S]*?)<\/inventionTitle>/)?.[1]?.trim()
       const appNo = item.match(/<applicationNumber>([\s\S]*?)<\/applicationNumber>/)?.[1]?.trim()
       const appDate = item.match(/<applicationDate>([\s\S]*?)<\/applicationDate>/)?.[1]?.trim()
-      if (title) items.push({
-        title, summary: null,
-        source_url: appNo ? `https://doi.kipris.or.kr/infoDS?appl_no=${appNo}` : 'https://www.kipris.or.kr',
-        published_at: appDate || new Date().toISOString(), country: 'KR'
-      })
+      if (title) {
+        const { include, score } = shouldInclude(title, '', 'KIPRIS', 'patent', keyword)
+        if (include) items.push({
+          title, summary: null,
+          source_url: appNo ? `https://doi.kipris.or.kr/infoDS?appl_no=${appNo}` : 'https://www.kipris.or.kr',
+          published_at: appDate || new Date().toISOString(), country: 'KR',
+          relevance_score: score, trust_score: trustScore('KIPRIS_출원', 'patent')
+        })
+      }
     }
     return items
   } catch (e) { console.error('KIPRIS 오류:', e.message); return [] }
@@ -81,10 +122,12 @@ async function saveEvidence(trendId, items, sourceName) {
   if (!items.length) return 0
   const rows = items.filter(item => item.source_url).map(item => ({
     trend_id: trendId, type: 'patent', title: item.title, summary: item.summary,
-    source_url: item.source_url, source_name: sourceName,
+    source_url: item.source_url, source_name: item.source_name || sourceName,
     country: item.country, region: regionOf(item.country),
     language: item.country === 'KR' ? 'ko' : 'en',
-    published_at: item.published_at || new Date().toISOString(), relevance_score: 0.85
+    published_at: item.published_at || new Date().toISOString(),
+    relevance_score: item.relevance_score || 0.75,
+    trust_score: item.trust_score || 0.75
   }))
   if (!rows.length) return 0
   const { data, error } = await supabase.from('evidence')
@@ -102,10 +145,16 @@ export default async function handler(req, res) {
     for (const kw of TECH_KEYWORDS) {
       const trendId = await getTrendId(kw.ko)
       if (!trendId) continue
-      const [kr, ep] = await Promise.all([fetchKIPRIS(kw.ko), fetchEPO(kw.en)])
+      const [kr, ep, us] = await Promise.all([
+        fetchKIPRIS(kw.ko),
+        fetchEPO(kw.en),
+        fetchUSPTO(kw.ko, kw.en)
+      ])
       const sKR = await saveEvidence(trendId, kr, 'KIPRIS')
       const sEP = await saveEvidence(trendId, ep, 'EPO')
-      results.push({ keyword: kw.ko, KIPRIS: sKR, EPO: sEP })
+      const sUS = await saveEvidence(trendId, us, 'USPTO')
+      console.log(`[${kw.ko}] 특허 KR:${sKR} EU:${sEP} US:${sUS}`)
+      results.push({ keyword: kw.ko, KIPRIS: sKR, EPO: sEP, USPTO: sUS })
       await new Promise(r => setTimeout(r, 1500))
     }
     res.status(200).json({ ok: true, message: `특허 수집 완료 — ${results.length}개 키워드 (KR+EU)`, details: results })
